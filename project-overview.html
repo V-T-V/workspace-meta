@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>D:\M_X_M 项目梳理</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9e2ef;
+      --brand: #1d4ed8;
+      --brand-soft: #e8f0ff;
+      --ok: #047857;
+      --warn: #b45309;
+      --code: #101828;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.6;
+    }
+    header {
+      background: linear-gradient(135deg, #172033, #1d4ed8);
+      color: white;
+      padding: 44px 28px 34px;
+    }
+    header .wrap, main { max-width: 1180px; margin: 0 auto; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.2; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 24px; border-left: 5px solid var(--brand); padding-left: 12px; }
+    h3 { margin: 22px 0 10px; font-size: 18px; }
+    p { margin: 8px 0; }
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    main { padding: 26px 18px 56px; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.26);
+      font-size: 13px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .stat, .card, .project {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+    }
+    .stat { padding: 16px; }
+    .stat strong { display: block; font-size: 28px; line-height: 1.2; }
+    .stat span { color: var(--muted); font-size: 13px; }
+    .card { padding: 18px; margin: 14px 0; }
+    .project { padding: 18px; margin: 16px 0; }
+    .project-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+    .project h3 { margin: 0; font-size: 21px; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #1e3a8a;
+      background: var(--brand-soft);
+      border: 1px solid #c7d7fe;
+      white-space: nowrap;
+    }
+    .tag.alt { color: #065f46; background: #ecfdf3; border-color: #b7e4ca; }
+    .tag.warn { color: #92400e; background: #fff7ed; border-color: #fed7aa; }
+    .small { color: var(--muted); font-size: 13px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { background: #eef4ff; color: #1e3a8a; font-size: 13px; }
+    tr:last-child td { border-bottom: 0; }
+    code {
+      font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+      background: #eef2f7;
+      color: var(--code);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 0.92em;
+    }
+    pre {
+      overflow: auto;
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 13px;
+    }
+    ul { padding-left: 22px; }
+    .cols {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .note {
+      border-left: 4px solid var(--warn);
+      background: #fff7ed;
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin: 12px 0;
+    }
+    .ok {
+      border-left: 4px solid var(--ok);
+      background: #ecfdf3;
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin: 12px 0;
+    }
+    @media (max-width: 860px) {
+      .summary-grid, .cols { grid-template-columns: 1fr; }
+      .project-head { flex-direction: column; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>D:\M_X_M 项目梳理</h1>
+      <p>当前文件夹是一个多项目工作区，主要围绕 Agent、AI 应用、可视化、游戏、测试平台和 2D 转 3D 工具展开。本文档基于根目录、README、package 配置、pubspec、pyproject 与项目结构生成。</p>
+      <div class="meta">
+        <span class="pill">更新日期：2026-06-29</span>
+        <span class="pill">顶层项目：10 个</span>
+        <span class="pill">根目录不是 Git 仓库</span>
+        <span class="pill">独立 Git 仓库：3 个</span>
+        <span class="pill">主要语言：TypeScript / Dart / Python</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>一、总体结论</h2>
+      <div class="summary-grid">
+        <div class="stat"><strong>10</strong><span>顶层项目目录</span></div>
+        <div class="stat"><strong>7+</strong><span>Node / TypeScript 项目</span></div>
+        <div class="stat"><strong>1</strong><span>Flutter 移动端项目</span></div>
+        <div class="stat"><strong>1</strong><span>大型 pnpm monorepo</span></div>
+      </div>
+      <div class="card">
+        <p><strong>主线方向：</strong>工作区具有明显的 Agent 实验与产品化倾向：从最小 ReAct Agent、Agent 主循环基座，到旅行规划、道德困境交互、轨道调度游戏 AI、跨端 E2E Agent 平台，再到移动端智能助手。</p>
+        <p><strong>工程风格：</strong>多数项目采用 Node 20+、TypeScript ESM、Vite、tsx、ESLint 9、Prettier、node:test，并强调离线可运行、OpenAI 兼容接口、本地代理保护 API Key、纯逻辑层可测试。</p>
+        <p><strong>部署形态：</strong>既有纯静态前端，也有 Vite + 本地 Node server，全栈工具类应用，Flutter 客户端，以及 Next.js + pnpm workspace 的平台型 monorepo。</p>
+        <p><strong>当前重点：</strong><code>e2e-fusion</code> 是规模最大的工程化平台；<code>agentloop</code> 是可复用的 Agent 基座；<code>tripplan</code> 是状态驱动 Agent 产品样板；<code>agentapp</code> 是移动端落地入口；<code>modelstudio</code> 是 3D 生成工具链方向。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>二、项目清单</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>项目</th>
+            <th>定位</th>
+            <th>技术栈</th>
+            <th>运行入口</th>
+            <th>规模</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>agentapp</code></td><td>安卓优先的多 Agent 智能助手 App</td><td>Flutter / Dart / Riverpod / SQLite / dio</td><td><code>flutter run</code></td><td>约 68 文件</td></tr>
+          <tr><td><code>agentloop</code></td><td>Agent 主循环基座</td><td>TypeScript / Node / tsx / OTel</td><td><code>npm run cli</code></td><td>约 56 文件</td></tr>
+          <tr><td><code>agentresearch</code></td><td>每日 Agent 研究记录 + 可运行 ReAct Agent</td><td>TypeScript / Node / 原生 fetch</td><td><code>npm run agent</code></td><td>约 30 文件</td></tr>
+          <tr><td><code>agenttrain</code></td><td>Mini Metro 风轨道调度小游戏 + AI 顾问</td><td>Vite / TypeScript / Canvas / Node server</td><td><code>npm run dev:all</code></td><td>约 36 文件</td></tr>
+          <tr><td><code>ai-expansion-analysis</code></td><td>AI 扩张方向可视化仪表盘</td><td>HTML / CSS / JS / Node 数据引擎</td><td>打开 <code>index.html</code></td><td>约 24 文件</td></tr>
+          <tr><td><code>dashan</code></td><td>道德困境选择与“万事皆善”对话系统</td><td>Vite / TypeScript / Node server / CLI</td><td><code>npm run dev</code></td><td>约 27 文件</td></tr>
+          <tr><td><code>e2e-fusion</code></td><td>跨端联合验证平台 + AI E2E Agent</td><td>pnpm monorepo / Next.js / Playwright / Prisma</td><td><code>pnpm build</code>、<code>pnpm --filter @e2e-fusion/platform dev</code></td><td>约 334 文件</td></tr>
+          <tr><td><code>kids-games</code></td><td>3-6 岁儿童网页小游戏合集</td><td>Vite / TypeScript / DOM / Canvas / SVG</td><td><code>npm run dev</code></td><td>约 89 文件</td></tr>
+          <tr><td><code>modelstudio</code></td><td>2D 图片生成 3D 模型与浏览器网格编辑器</td><td>React / Three.js / Fastify / FastAPI / PyTorch</td><td>web + server + generator 三服务</td><td>约 67 文件</td></tr>
+          <tr><td><code>tripplan</code></td><td>旅行规划 Agent，工具调用实时改行程</td><td>Vite / TypeScript / Node server / AMap</td><td><code>npm run dev</code></td><td>约 40 文件</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>三、单项目梳理</h2>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>agentapp</h3>
+            <p>安卓优先的 AI 智能助手应用，内置工作、学习、生活、通用四类专业 Agent，并由路由 Agent 自动分发任务。核心特征是纯端侧架构：无后端，API Key 保存在本机安全存储中。</p>
+            <div class="tag-row"><span class="tag">Flutter</span><span class="tag">Dart</span><span class="tag">Riverpod</span><span class="tag">SQLite</span><span class="tag">OpenAI 兼容</span></div>
+          </div>
+          <div class="small"><code>agentapp/</code><br>移动端 App</div>
+        </div>
+        <ul>
+          <li><strong>主要模块：</strong><code>lib/core</code> 常量/主题/数据库，<code>lib/data</code> LLM 客户端与仓储，<code>lib/domain</code> Agent 与 prompt，<code>lib/presentation</code> UI。</li>
+          <li><strong>能力：</strong>流式对话、Markdown 渲染、历史会话、长期记忆、本地 SQLite、安全存储。</li>
+          <li><strong>命令：</strong><code>flutter pub get</code>、<code>flutter run</code>、<code>flutter test</code>、<code>flutter build apk --debug</code>。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>agentloop</h3>
+            <p>聚焦 Agent 主循环的独立基座，把 LLM 与工具调用的循环拆成可观测、可流式、可持久化、可评估的基础能力。</p>
+            <div class="tag-row"><span class="tag">TypeScript</span><span class="tag">Node 20.19+</span><span class="tag">零运行时依赖</span><span class="tag">OTel</span><span class="tag">HITL</span></div>
+          </div>
+          <div class="small"><code>agentloop/</code><br>Agent 基础设施</div>
+        </div>
+        <ul>
+          <li><strong>核心文件：</strong><code>src/loop.ts</code> 主循环，<code>compact.ts</code> 上下文压缩，<code>streaming.ts</code> SSE 聚合，<code>trace.ts</code> span，<code>otel.ts</code> 导出，<code>subagent.ts</code> 委派。</li>
+          <li><strong>内置工具：</strong><code>datetime</code>、<code>calculator</code>、<code>http_get</code>、<code>delegate</code>、<code>delegate_parallel</code>。</li>
+          <li><strong>命令：</strong><code>npm run cli</code>、<code>npm test</code>、<code>npm run type-check</code>、<code>npm run lint</code>。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>agentresearch</h3>
+            <p>研究记录仓库与最小可用 ReAct Agent 的组合项目。Agent 可以写入每日研究笔记、检索历史笔记、抓取网页和读取项目文件。</p>
+            <div class="tag-row"><span class="tag">ReAct Agent</span><span class="tag">TypeScript</span><span class="tag">每日笔记</span><span class="tag">StubLLM</span></div>
+          </div>
+          <div class="small"><code>agentresearch/</code><br>研究 + Agent</div>
+        </div>
+        <ul>
+          <li><strong>结构：</strong><code>src/agent</code> 主循环与 LLM，<code>src/tools</code> 工具，<code>daily</code> 每日记录，<code>notes</code> 主题深读。</li>
+          <li><strong>命令：</strong><code>npm run agent</code>、<code>npm run new-day</code>、<code>npm test</code>。</li>
+          <li><strong>价值：</strong>适合沉淀 Agent 设计模式，也为其他项目复用了 retry、env、LLM 客户端模式。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>agenttrain</h3>
+            <p>Mini Metro 风轨道调度小游戏，逻辑层与渲染层分离；额外内置 AI 剧本生成、策略顾问和自动驾驶。</p>
+            <div class="tag-row"><span class="tag">Vite</span><span class="tag">Canvas</span><span class="tag">游戏</span><span class="tag">本地代理</span><span class="tag">AI 顾问</span></div>
+          </div>
+          <div class="small"><code>agenttrain/</code><br>游戏 + AI</div>
+        </div>
+        <ul>
+          <li><strong>关键模块：</strong><code>src/game/simulation.ts</code> 纯逻辑步进，<code>render.ts</code> Canvas，<code>input.ts</code> 输入意图，<code>src/ai</code> AI 功能。</li>
+          <li><strong>服务：</strong>前端 Vite 默认 5173，本地 AI 代理 5174，API Key 只在 server 侧。</li>
+          <li><strong>命令：</strong><code>npm run dev</code>、<code>npm run dev:all</code>、<code>npm run server</code>、<code>npm test</code>。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>ai-expansion-analysis</h3>
+            <p>纯前端可视化项目，展示 AI 在不同领域的采用率、介入深度、成熟度、扩张速度和未来趋势。另带动态评估引擎，可从 arXiv、HN、GitHub、新闻等信号生成快照。</p>
+            <div class="tag-row"><span class="tag">静态站点</span><span class="tag">Canvas 可视化</span><span class="tag">零依赖</span><span class="tag">动态评分引擎</span></div>
+          </div>
+          <div class="small"><code>ai-expansion-analysis/</code><br>可视化报告</div>
+        </div>
+        <ul>
+          <li><strong>前端：</strong><code>index.html</code>、<code>css/style.css</code>、<code>js/data.js</code>、<code>js/viz.js</code>、<code>js/app.js</code>。</li>
+          <li><strong>引擎：</strong><code>engine/run.js</code> 并发采集、评分、快照、告警，支持 <code>--synth</code> 合成模式。</li>
+          <li><strong>运行：</strong>可直接打开 <code>index.html</code>；推荐 <code>python -m http.server 8000</code> 以加载动态输出。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>dashan</h3>
+            <p>一个对话/选项交互系统：抛出复杂困境，用户选择任一选项后，系统先指出选择的“恶”，再反转论证为“大善”。支持网页和 CLI。</p>
+            <div class="tag-row"><span class="tag">Vite</span><span class="tag">TypeScript</span><span class="tag">CLI</span><span class="tag">本地代理</span><span class="tag">离线预设库</span></div>
+          </div>
+          <div class="small"><code>dashan/</code><br>交互叙事</div>
+        </div>
+        <ul>
+          <li><strong>核心：</strong><code>shared/prompt.ts</code> system prompt，<code>shared/fallback.ts</code> 预设困境，<code>shared/ledgerCore.ts</code> 善恶簿。</li>
+          <li><strong>形态：</strong>网页端 Vite + server 代理；CLI 复用同一套核心逻辑。</li>
+          <li><strong>命令：</strong><code>npm run dev</code>、<code>npm run cli</code>、<code>npm run test</code>。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>e2e-fusion</h3>
+            <p>跨端联合验证平台，用一套编排验证 Web、Electron、原生 Windows、HTTP API、CLI/进程，并内置 AI E2E Agent 实现文档读取、功能探索、测试生成、自愈和失败分析。</p>
+            <div class="tag-row"><span class="tag">pnpm workspace</span><span class="tag">Next.js</span><span class="tag">Playwright</span><span class="tag">Prisma</span><span class="tag">AI E2E Agent</span></div>
+          </div>
+          <div class="small"><code>e2e-fusion/</code><br>平台型 monorepo</div>
+        </div>
+        <ul>
+          <li><strong>应用：</strong><code>apps/platform</code> 管理平台，<code>apps/runner</code> CLI，<code>apps/worker</code> 执行 worker。</li>
+          <li><strong>包：</strong><code>core</code>、<code>case-parser</code>、<code>drivers</code>、<code>orchestrator</code>、<code>runner-core</code>、<code>scheduler</code>、<code>storage</code>、<code>reporter</code>、<code>auth</code>、<code>integrations</code>、<code>agent-core</code>、<code>ai-provider</code>、<code>knowledge</code>、<code>shared</code>。</li>
+          <li><strong>命令：</strong><code>pnpm install</code>、<code>pnpm build</code>、<code>pnpm test</code>、<code>pnpm --filter @e2e-fusion/platform dev</code>。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>kids-games</h3>
+            <p>面向 3-6 岁儿童的网页小游戏合集，采用原生 DOM、Canvas、SVG 与 Web Audio，不依赖第三方游戏引擎。</p>
+            <div class="tag-row"><span class="tag">Vite</span><span class="tag">TypeScript</span><span class="tag">儿童游戏</span><span class="tag">Canvas/SVG</span><span class="tag warn">README 与配置存在数量差异</span></div>
+          </div>
+          <div class="small"><code>kids-games/</code><br>静态游戏站</div>
+        </div>
+        <ul>
+          <li><strong>结构：</strong><code>src/core</code> 公共引擎，<code>src/ui</code> 通用组件，<code>src/lobby</code> 大厅，<code>src/games</code> 游戏模块。</li>
+          <li><strong>命令：</strong><code>npm run dev</code>、<code>npm run build</code>、<code>npm test</code>。</li>
+          <li><strong>观察点：</strong>README 前部写 49 个游戏并列出完整清单，但 <code>package.json</code> 描述仍写 8 个，README 项目结构也写“8 个游戏”。建议确认当前实现数量并统一文档。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>modelstudio</h3>
+            <p>2D 图片生成 3D 模型并在浏览器中编辑网格的独立子系统。由 web、server、generator 三层组成，支持深度重建、本地 AI 和云端 Replicate 路径。</p>
+            <div class="tag-row"><span class="tag">React</span><span class="tag">Three.js</span><span class="tag">Fastify</span><span class="tag">FastAPI</span><span class="tag">PyTorch</span><span class="tag">Docker Compose</span></div>
+          </div>
+          <div class="small"><code>modelstudio/</code><br>3D 生成编辑器</div>
+        </div>
+        <ul>
+          <li><strong>web：</strong>Vite + React + Three.js + R3F，负责编辑器 UI、视口、导出。</li>
+          <li><strong>server：</strong>Fastify 网关，负责上传、任务、文件管理、进度推送。</li>
+          <li><strong>generator：</strong>FastAPI + PyTorch，负责能力探测、推理、深度重建、后处理。</li>
+          <li><strong>命令：</strong>generator 运行 <code>uvicorn app.main:app --port 8001</code>，server 运行 <code>npm run dev</code>，web 运行 <code>npm run dev</code>。</li>
+        </ul>
+      </article>
+
+      <article class="project">
+        <div class="project-head">
+          <div>
+            <h3>tripplan</h3>
+            <p>旅行规划 Agent，把行程建模为可变状态，Agent 通过工具调用增删游览点、改交通、重排行程时间链，前端通过 SSE 实时更新地图和时间线。</p>
+            <div class="tag-row"><span class="tag">Vite</span><span class="tag">TypeScript</span><span class="tag">SSE</span><span class="tag">AMap</span><span class="tag">Agent 工具调用</span></div>
+          </div>
+          <div class="small"><code>tripplan/</code><br>旅行规划 Agent</div>
+        </div>
+        <ul>
+          <li><strong>前端：</strong><code>src/chat.ts</code>、<code>src/map.ts</code>、<code>src/itinerary-view.ts</code>、<code>src/api.ts</code>。</li>
+          <li><strong>后端：</strong><code>server/index.ts</code> SSE 与会话 API，<code>server/session.ts</code> 会话状态，<code>server/store.ts</code> 文件存档。</li>
+          <li><strong>共享逻辑：</strong><code>shared/itinerary.ts</code> 时间链自洽，<code>shared/amap.ts</code> 高德真实/种子双模式。</li>
+          <li><strong>命令：</strong><code>npm run dev</code>、<code>npm run cli</code>、<code>npm test</code>。</li>
+        </ul>
+      </article>
+    </section>
+
+    <section>
+      <h2>四、技术栈分布</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>前端与交互</h3>
+          <ul>
+            <li><strong>Vite + TypeScript：</strong><code>agenttrain</code>、<code>dashan</code>、<code>kids-games</code>、<code>tripplan</code>、<code>modelstudio/web</code>。</li>
+            <li><strong>React：</strong><code>modelstudio/web</code>，<code>e2e-fusion/apps/platform</code> 使用 Next.js + React。</li>
+            <li><strong>纯 DOM / Canvas：</strong><code>agenttrain</code>、<code>kids-games</code>、<code>ai-expansion-analysis</code>。</li>
+            <li><strong>移动端：</strong><code>agentapp</code> 使用 Flutter。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>后端与 AI</h3>
+          <ul>
+            <li><strong>Node/tsx server：</strong><code>agenttrain</code>、<code>dashan</code>、<code>tripplan</code>。</li>
+            <li><strong>Fastify：</strong><code>modelstudio/server</code>。</li>
+            <li><strong>FastAPI/Python：</strong><code>modelstudio/generator</code>。</li>
+            <li><strong>OpenAI 兼容接口：</strong>多项目统一支持智谱 GLM、DeepSeek、OpenAI 等兼容服务。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <h3>工程脚本共性</h3>
+        <p>多数 TypeScript 项目都具备 <code>type-check</code>、<code>lint</code>、<code>format</code>、<code>test</code>，测试多用 <code>node --test --import tsx</code>。这使得各项目虽独立，但质量控制方式基本一致。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>五、工作区关系图</h2>
+      <pre>
+D:\M_X_M
+├─ agentapp              Flutter 多 Agent 助手 App
+├─ agentloop             Agent 主循环基座，可作为其他 Agent 项目的抽象来源
+├─ agentresearch         研究笔记 + 最小 ReAct Agent，沉淀工具和经验
+├─ agenttrain            Canvas 轨道调度游戏 + AI 剧本/顾问/自动驾驶
+├─ ai-expansion-analysis AI 扩张可视化 + 动态评分引擎
+├─ dashan                道德困境交互系统，网页 + CLI
+├─ e2e-fusion            跨端 E2E 验证平台，pnpm monorepo
+├─ kids-games            儿童小游戏合集
+├─ modelstudio           2D 转 3D 生成与编辑器，web/server/generator 三层
+└─ tripplan              旅行规划 Agent，SSE + 地图 + 可变行程状态
+      </pre>
+    </section>
+
+    <section>
+      <h2>六、共性模式</h2>
+      <div class="card">
+        <ul>
+          <li><strong>离线优先：</strong>多个项目无 API Key 也能运行，使用 StubLLM、种子数据或预设剧本兜底。</li>
+          <li><strong>OpenAI 兼容：</strong>LLM 接入普遍抽象为 base URL、API key、model，便于切换服务商。</li>
+          <li><strong>本地代理保护密钥：</strong>网页项目通常由本地 Node server 读取密钥，浏览器只访问同源 API。</li>
+          <li><strong>逻辑与 UI 分离：</strong>游戏和行程项目把核心规则放在纯逻辑模块，便于单测和复用。</li>
+          <li><strong>Agent 工具调用：</strong><code>agentloop</code>、<code>agentresearch</code>、<code>tripplan</code>、<code>e2e-fusion</code> 都强调工具 schema、状态变更和可观察轨迹。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>七、观察点与建议</h2>
+      <div class="note">
+        <p><strong>1. 根目录不是 Git 仓库。</strong>如果这些项目需要统一版本管理，应考虑把当前目录初始化为上层 meta repo，或者保持每个项目独立 Git 仓库并建立清晰说明。</p>
+      </div>
+      <div class="note">
+        <p><strong>2. <code>kids-games</code> 文档存在数量不一致。</strong>README 顶部宣称 49 个游戏，但 package 描述和结构说明仍是 8 个。建议以实际 <code>src/games</code> 注册表为准统一 README、package 描述与测试说明。</p>
+      </div>
+      <div class="note">
+        <p><strong>3. 多个项目已安装 <code>node_modules</code>。</strong>工作区整体体积和扫描噪声较大。建议后续统计、搜索、备份和归档默认排除 <code>node_modules</code>、<code>dist</code>、<code>.next</code>、<code>build</code>。</p>
+      </div>
+      <div class="ok">
+        <p><strong>4. 可以抽一个共享工程模板。</strong><code>env</code> 加载、retry、OpenAI 兼容 LLM 客户端、StubLLM、本地代理、node:test 配置在多个项目重复出现，适合沉淀为模板或内部包。</p>
+      </div>
+      <div class="ok">
+        <p><strong>5. 建议建立工作区索引。</strong>可增加根目录 <code>README.md</code>，说明每个子项目的定位、运行命令、端口、依赖和维护状态，降低后续切换成本。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>八、快速运行索引</h2>
+      <table>
+        <thead>
+          <tr><th>项目</th><th>开发/运行命令</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>agentapp</code></td><td><code>flutter pub get</code><br><code>flutter run</code></td><td>连接安卓设备或模拟器。</td></tr>
+          <tr><td><code>agentloop</code></td><td><code>npm install</code><br><code>npm run cli</code></td><td>无 API Key 时走 StubLLM。</td></tr>
+          <tr><td><code>agentresearch</code></td><td><code>npm install</code><br><code>npm run agent</code></td><td>也可用 <code>npm run new-day</code> 创建每日笔记。</td></tr>
+          <tr><td><code>agenttrain</code></td><td><code>npm install</code><br><code>npm run dev:all</code></td><td>前端 + AI 代理同启。</td></tr>
+          <tr><td><code>ai-expansion-analysis</code></td><td><code>python -m http.server 8000</code></td><td>也可直接打开 <code>index.html</code>。</td></tr>
+          <tr><td><code>dashan</code></td><td><code>npm install</code><br><code>npm run dev</code></td><td>也支持 <code>npm run cli</code>。</td></tr>
+          <tr><td><code>e2e-fusion</code></td><td><code>pnpm install</code><br><code>pnpm build</code><br><code>pnpm --filter @e2e-fusion/platform dev</code></td><td>平台端默认 Next.js 3100。</td></tr>
+          <tr><td><code>kids-games</code></td><td><code>npm install</code><br><code>npm run dev</code></td><td>静态小游戏站。</td></tr>
+          <tr><td><code>modelstudio</code></td><td><code>generator: uvicorn app.main:app --port 8001</code><br><code>server: npm run dev</code><br><code>web: npm run dev</code></td><td>三服务协同，web 访问编辑器。</td></tr>
+          <tr><td><code>tripplan</code></td><td><code>npm install</code><br><code>npm run dev</code></td><td>前端 + server；无 Key 可用离线种子。</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>
+
+

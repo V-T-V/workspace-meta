@@ -1,0 +1,61 @@
+# 子项目各自有独立 git 仓库，不入此仓库
+agentapp/
+agentloop/
+agentresearch/
+agenttrain/
+ai-expansion-analysis/
+algorithms-atlas/
+app-game-research/
+bevy-src/
+city-hunt/
+cogent/
+computer-use-rtc/
+dashan/
+e2e-fusion/
+earth-history-3d/
+export/
+fusion-power-3d/
+future-world-3055/
+godot-src/
+history-mist/
+kids-games/
+lightai/
+logos-formal/
+logos-sim/
+mobile-game-workflow/
+modelstudio/
+on-device-llm/
+pastoral-travel/
+physics-sim/
+platform-demo/
+poetry-garden/
+scripts/
+sky-carrier/
+stock-ai/
+superpower-system/
+taixu-dao-world/
+tiny-edge-models/
+tripplan/
+voxel-craft/
+web-game-research/
+wildera/
+wuwan/
+大模型研究/
+.portfolio/
+node_modules/
+*.log
+nul
+# 引擎二进制/压缩包（不入库）
+*.exe
+*.zip
+# zcode 会话计划（临时）
+.zcode/
+# 子项目符号链接
+agent-coding-research
+# 根目录 package（Havok 依赖，非此仓库内容）
+package.json
+package-lock.json
+# 临时评审文档
+NEW_PROJECTS_REVIEW_*.md
+# 站点设计选项（草稿）
+.sites-design-options/

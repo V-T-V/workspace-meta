@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M_X_M Workspace · 23 Projects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0f;
+    --surface:rgba(255,255,255,0.035);
+    --border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);
+    --fg:#ececf1;
+    --fg-muted:rgba(236,236,241,0.6);
+    --fg-dim:rgba(236,236,241,0.4);
+    --accent:#60a5fa;
+    --accent-2:#22d3ee;
+    --accent-glow:rgba(96,165,250,0.4);
+    --green:#34d399; --yellow:#fbbf24; --rose:#fb7185; --cyan:#22d3ee;
+    --radius:18px;
+    --shadow-lg:0 24px 60px -16px rgba(0,0,0,0.65);
+    --maxw:1240px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);
+    background-image:
+      radial-gradient(1100px circle at 50% -8%, rgba(96,165,250,0.16), transparent 55%),
+      radial-gradient(800px circle at 85% 20%, rgba(96,165,250,0.08), transparent 50%);
+    background-attachment:fixed;
+    color:var(--fg);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 32px}
+
+  /* HERO */
+  .hero{text-align:center;padding:140px 0 90px;position:relative}
+  .hero .eyebrow{
+    display:inline-block;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.18em;
+    color:var(--accent);background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.25);
+    padding:7px 16px;border-radius:100px;margin-bottom:28px;font-weight:600;
+  }
+  .hero h1{
+    font-family:'Space Grotesk','Inter',sans-serif;
+    font-size:clamp(2.6rem,6.5vw,4.5rem);
+    font-weight:700;letter-spacing:-0.035em;line-height:1.02;
+    background:linear-gradient(110deg,#fff 20%,var(--accent) 55%,var(--accent-2) 90%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero .sub{color:var(--fg-muted);font-size:1.15rem;margin-top:24px;max-width:560px;margin-left:auto;margin-right:auto}
+  .hero-stats{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:64px}
+  .hstat{
+    background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--border);border-radius:var(--radius);
+    padding:26px 34px;min-width:130px;transition:.25s;
+  }
+  .hstat:hover{border-color:var(--border-strong);transform:translateY(-3px)}
+  .hstat .num{font-family:'Space Grotesk',sans-serif;font-size:2.6rem;font-weight:700;letter-spacing:-0.03em;line-height:1}
+  .hstat .lab{font-size:0.74rem;color:var(--fg-muted);margin-top:8px;text-transform:uppercase;letter-spacing:0.1em}
+  .hstat:nth-child(1) .num{color:var(--accent)}
+  .hstat:nth-child(2) .num{color:var(--green)}
+  .hstat:nth-child(3) .num{color:var(--accent-2)}
+  .hstat:nth-child(4) .num{color:var(--cyan)}
+  .hstat:nth-child(5) .num{color:var(--yellow)}
+
+  /* TOOLBAR */
+  .toolbar{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;margin:24px 0 8px}
+  #search{
+    flex:1;min-width:240px;max-width:420px;background:var(--surface);
+    border:1px solid var(--border);color:var(--fg);padding:13px 20px;border-radius:100px;
+    font-size:0.95rem;font-family:inherit;transition:.2s;
+  }
+  #search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+  .filter{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{background:var(--surface);border:1px solid var(--border);color:var(--fg-muted);
+    padding:10px 18px;border-radius:100px;font-size:0.82rem;cursor:pointer;transition:.2s;font-family:inherit}
+  .chip:hover{border-color:var(--border-strong);color:var(--fg)}
+  .chip.active{background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    border-color:transparent;color:#fff;font-weight:600}
+
+  /* SECTIONS & CARDS */
+  .section{padding:64px 0 24px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:36px}
+  .sec-head h2{font-family:'Space Grotesk',sans-serif;font-size:1.7rem;font-weight:700;letter-spacing:-0.02em}
+  .sec-head .count{font-size:0.82rem;color:var(--fg-dim);background:var(--surface);
+    border:1px solid var(--border);padding:4px 12px;border-radius:100px}
+  .sec-head .bar{flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:22px}
+  .card{
+    background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--border);border-radius:var(--radius);
+    padding:30px;transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease;
+    position:relative;overflow:hidden;
+  }
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(180deg,var(--accent),transparent);opacity:0;transition:.25s}
+  .card:hover{transform:translateY(-4px);border-color:var(--border-strong);box-shadow:var(--shadow-lg)}
+  .card:hover::before{opacity:1}
+  .c-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+  .c-head h3{font-family:'Space Grotesk',sans-serif;font-size:1.25rem;font-weight:600;letter-spacing:-0.01em}
+  .c-title{font-size:0.82rem;color:var(--fg-muted);margin-bottom:14px}
+  .c-desc{font-size:0.9rem;color:var(--fg);margin-bottom:16px;min-height:2.8em;line-height:1.6}
+  .stack{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+  .stack span{font-size:0.72rem;padding:4px 10px;border-radius:6px;
+    background:rgba(96,165,250,0.1);color:var(--accent);border:1px solid rgba(96,165,250,0.2)}
+  .c-foot{display:flex;justify-content:space-between;align-items:center;
+    font-size:0.74rem;color:var(--fg-dim);border-top:1px solid var(--border);padding-top:14px}
+  .badge{font-size:0.7rem;padding:3px 11px;border-radius:100px;font-weight:600}
+  .b-high{background:rgba(52,211,153,0.14);color:var(--green)}
+  .b-mid{background:rgba(251,191,36,0.14);color:var(--yellow)}
+  .b-low{background:rgba(252,165,165,0.12);color:var(--rose)}
+  .vis{font-size:0.7rem;padding:3px 11px;border-radius:100px}
+  .vis-pub{background:rgba(96,165,250,0.14);color:var(--accent-2)}
+  .vis-pri{background:rgba(236,236,241,0.08);color:var(--fg-muted)}
+  .gh{color:var(--fg-dim);text-decoration:none;font-size:0.74rem;font-weight:500;transition:.2s}
+  .gh:hover{color:var(--accent)}
+  .c-actions{display:flex;align-items:center;gap:12px}
+  .launch-btn{
+    font-family:inherit;font-size:0.74rem;font-weight:600;cursor:pointer;
+    padding:4px 12px;border-radius:100px;border:1px solid rgba(52,211,153,0.4);
+    background:rgba(52,211,153,0.1);color:var(--green);transition:.2s;
+  }
+  .launch-btn:hover:not(:disabled){background:rgba(52,211,153,0.2);border-color:var(--green)}
+  .launch-btn:disabled{cursor:wait;opacity:0.7}
+  .launch-btn.running{background:rgba(52,211,153,0.2);border-color:var(--green);cursor:default}
+  .launch-toast{
+    position:fixed;bottom:32px;left:50%;transform:translateX(-50%);
+    background:rgba(19,19,26,0.95);backdrop-filter:blur(12px);
+    border:1px solid var(--border-strong);border-radius:100px;
+    padding:12px 24px;font-size:0.85rem;color:var(--fg);z-index:9999;
+    opacity:0;transition:opacity .3s;max-width:90vw;text-align:center;
+    box-shadow:var(--shadow-lg);
+  }
+  .launch-toast.success{border-color:rgba(52,211,153,0.5);color:var(--green)}
+  .launch-toast.error{border-color:rgba(251,113,133,0.5);color:var(--rose)}
+  .launch-toast.loading{border-color:rgba(251,191,36,0.5);color:var(--yellow)}
+
+  /* INSIGHT SECTIONS */
+  .panel{
+    background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--border);border-radius:var(--radius);padding:40px;margin-top:40px;
+  }
+  .panel h2{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:28px}
+  .panel h2 .ic{color:var(--accent)}
+  .rel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .rel-item{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:22px;transition:.2s}
+  .rel-item:hover{border-color:var(--border-strong);background:rgba(255,255,255,0.04)}
+  .rel-item .rh{font-weight:600;margin-bottom:8px;color:var(--cyan);font-size:0.95rem}
+  .rel-item p{font-size:0.85rem;color:var(--fg-muted);line-height:1.6}
+  .rel-item code{background:rgba(96,165,250,0.15);padding:1px 7px;border-radius:5px;font-size:0.78rem;color:var(--accent)}
+
+  footer{text-align:center;color:var(--fg-dim);font-size:0.82rem;padding:60px 0 40px;margin-top:40px}
+  footer code{color:var(--accent);font-size:0.78rem}
+
+  @media(max-width:640px){
+    .wrap{padding:0 20px}
+    .hero{padding:90px 0 60px}
+    .grid{grid-template-columns:1fr}
+    .hero-stats{gap:12px}
+    .hstat{padding:20px;min-width:calc(50% - 6px)}
+    .hstat .num{font-size:2rem}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <span class="eyebrow">Multi-Project Workspace</span>
+    <h1>M_X_M 工作区</h1>
+    <p class="sub">23 个独立项目，跨 6 条产品线——Agent 基础设施、3D 世界、技术教育与更多。</p>
+    <div class="hero-stats">
+      <div class="hstat"><div class="num">39</div><div class="lab">项目</div></div>
+      <div class="hstat"><div class="num">10</div><div class="lab">产品线</div></div>
+      <div class="hstat"><div class="num">9</div><div class="lab">公开仓库</div></div>
+      <div class="hstat"><div class="num">14</div><div class="lab">高完成度</div></div>
+      <div class="hstat"><div class="num">4</div><div class="lab">游戏引擎</div></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <input id="search" type="text" placeholder="搜索项目 · 技术栈 · 描述…" />
+    <div class="filter">
+      <button class="chip active" data-f="all">全部</button>
+      <button class="chip" data-f="A">Agent 基础设施</button>
+      <button class="chip" data-f="B">AI 应用</button>
+      <button class="chip" data-f="C">技术教育</button>
+      <button class="chip" data-f="D">3D 游戏</button>
+      <button class="chip" data-f="E">研究</button>
+      <button class="chip" data-f="F">集成元层</button>
+      <button class="chip" data-f="G">哲学文化</button>
+      <button class="chip" data-f="H">工程模拟</button>
+      <button class="chip" data-f="I">Godot 手游</button>
+      <button class="chip" data-f="J">研究文档</button>
+    </div>
+  </div>
+
+  <div id="cards"></div>
+
+  <div class="panel">
+    <h2><span class="ic">🔗</span> 项目关联关系</h2>
+    <div class="rel-grid">
+      <div class="rel-item"><div class="rh">cogent → agentloop</div><p>声明式蓝图编译为 <code>agentloop</code> 的 <code>runLoop()</code>——工作区唯一强代码依赖。</p></div>
+      <div class="rel-item"><div class="rh">agentresearch ⇄ agentloop</div><p>同源的最小 ReAct 循环两种形态，M3 计划对齐。</p></div>
+      <div class="rel-item"><div class="rh">platform-demo = 集成胶水</div><p>非独立项目，是 cogent+agentloop+e2e-fusion 的产品契约与垂直切片证据。</p></div>
+      <div class="rel-item"><div class="rh">Babylon.js 互鉴</div><p>wildera（v8 WebGPU）与 future-world-3055（v7）共享引擎，物理接入可互鉴。</p></div>
+      <div class="rel-item"><div class="rh">three.js 互鉴</div><p>modelstudio（编辑器）与 taixu-dao-world（游戏）共享 three.js 渲染层。</p></div>
+      <div class="rel-item"><div class="rh">产品化元层</div><p>根目录 5 份 <code>*.md</code> 规划 + <code>scripts/</code> 校验 + <code>.portfolio/</code> 快照。</p></div>
+      <div class="rel-item"><div class="rh">logos 哲学三件套</div><p>logos-formal（Lean 证明）/ logos-sim（模拟）/ dashan（对话）覆盖哲学的证明—模拟—对话三态。</p></div>
+      <div class="rel-item"><div class="rh">Godot 手游线</div><p>app-game-research（调研）→ mobile-game-workflow（工具）→ voxel-craft / city-hunt / pastoral-travel（真游戏）。</p></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2><span class="ic">🎮</span> 游戏引擎技术栈</h2>
+    <div class="rel-grid">
+      <div class="rel-item"><div class="rh">Babylon.js · 严肃 3D</div><p>wildera（WebGPU+Havok 真启用）、future-world-3055（v7）、sky-carrier、physics-sim。渲染最强，物理内建。</p></div>
+      <div class="rel-item"><div class="rh">three.js · 3D 渲染</div><p>taixu-dao-world、modelstudio（R3F）、fusion-power-3d。灵活但只管渲染，做完整游戏需自补物理。</p></div>
+      <div class="rel-item"><div class="rh">Godot · 完整引擎</div><p>pastoral-travel / voxel-craft / city-hunt（4.7，含 mobile 渲染器）。可出 APK，含编辑器与多平台导出。</p></div>
+      <div class="rel-item"><div class="rh">无引擎 · DOM/Canvas</div><p>agenttrain、kids-games（81 游戏）。零依赖加载极快，轻量 2D 最优解。</p></div>
+    </div>
+  </div>
+
+  <footer>
+    M_X_M Workspace · 39 项目 · 10 产品线 · 数据基于代码核实（2026-07-20）<br>
+    详见 <code>WORKSPACE_OVERVIEW.md</code> · <code>GAME_ENGINE_RESEARCH.md</code>
+  </footer>
+</div>
+
+<script>
+const GH="https://github.com/V-T-V";
+const projects=[
+ {n:"agentloop",ln:"A",vis:"pub",lvl:"high",tech:["TypeScript","零依赖","OTel","MCP"],title:"Agent 主循环执行内核",desc:"聚焦 Agent 主循环的可嵌入基座，覆盖上下文压缩/流式/OTel/sub-agent/HITL/轨迹评估等 10+ 能力。",repo:"agentloop"},
+ {n:"cogent",ln:"A",vis:"pri",lvl:"mid",tech:["TypeScript","复用agentloop"],title:"声明式 Agent 框架",desc:"用 JSON/YAML 声明认知蓝图，编译为 agentloop 的 runLoop 执行。工作区唯一强代码依赖。",repo:"cogent"},
+ {n:"e2e-fusion",ln:"A",vis:"pri",lvl:"high",tech:["pnpm","Next.js","Playwright","Prisma"],title:"跨端 E2E 验证平台",desc:"AI 驱动的跨端联合验证（Web/桌面/API/CLI），3 apps + 15 packages，平台化潜力最高。",repo:"e2e-fusion"},
+ {n:"agentapp",ln:"A",vis:"pri",lvl:"high",tech:["Flutter","Riverpod","dio","sqlite3"],title:"多专业 Agent 助手 App",desc:"工作/学习/生活三场景，LLM 路由分发到专业 Agent。Android+Windows 双端，功能完整。",repo:"agentapp"},
+ {n:"agentresearch",ln:"A",vis:"pub",lvl:"high",tech:["TypeScript","零依赖","ReAct"],title:"ReAct Agent + 研究笔记",desc:"~200 行最小 ReAct 内核 + Agent/LLM 研究笔记仓库，6 工具，StubLLM 离线可跑。",repo:"agentresearch"},
+ {n:"tripplan",ln:"A",vis:"pri",lvl:"mid",lk:"tripplan",tech:["Vite","TypeScript","高德AMap"],title:"旅行规划 Agent",desc:"Agent 操作可变行程状态，支持多方案+持续会话迭代，含离线种子回退。",repo:"tripplan"},
+ {n:"stock-ai",ln:"A",vis:"pri",lvl:"mid",tech:["TypeScript","零依赖","ReAct"],title:"跨市场 ReAct Agent",desc:"A股/美股/港股，技术面+基本面+舆情+回测+每日报告，36 文件分层完整。",repo:"stock-ai"},
+ {n:"history-mist",ln:"B",vis:"pri",lvl:"high",tech:["TypeScript","Hono","sqlite3","OpenAI"],title:"历史探索智能体",desc:"多轮联网深挖、多源交叉验证、知识图谱、DOCX/PDF 报告导出。42 文件。",repo:"history-mist"},
+ {n:"dashan",ln:"B",vis:"pub",lvl:"high",lk:"dashan",tech:["TypeScript","Vite","无运行时依赖"],title:"大善系统 · 哲学对话",desc:"无论选什么都把你翻转夸成大善的困境对话系统。web/server/cli 三态共享逻辑。",repo:"dashan"},
+ {n:"computer-use-rtc",ln:"B",vis:"pri",lvl:"mid",tech:["Node","PowerShell","GLM视觉"],title:"RTC 视频自动化",desc:"截图→视觉识别→点击的 agentic 循环，不依赖 DOM，做 RTC 视频 E2E 自动化。",repo:"computer-use-rtc"},
+ {n:"algorithms-atlas",ln:"C",vis:"pub",lvl:"high",lk:"algorithms-atlas",tech:["Vite","TypeScript strict"],title:"3000 算法图谱",desc:"每算法 trace 录制+通用播放器动画演示。2629 文件、334 完整算法、2249 测试。",repo:"algorithms-atlas"},
+ {n:"kids-games",ln:"C",vis:"pub",lvl:"high",lk:"kids-games",tech:["Vite","TypeScript PWA","DOM"],title:"81 个儿童小游戏",desc:"3~6 岁 81 个寓教于乐网页小游戏，零引擎纯 DOM/Canvas，PWA 可离线。109 文件。",repo:"kids-games"},
+ {n:"lightai",ln:"C",vis:"pub",lvl:"high",tech:["Python","零依赖","HTML"],title:"轻量 AI 算法库",desc:"用经典算法（BM25/贝叶斯/MinHash）低成本替代大模型。101 个 .py + 31 web 页面。",repo:"lightai"},
+ {n:"ai-expansion-analysis",ln:"C",vis:"pub",lvl:"high",lk:"ai-expansion-analysis",tech:["纯HTML/JS","零依赖"],title:"AI 扩张可视化分析站",desc:"AI 扩张方向/深度/场景的热力图、L0-L4 介入阶梯、2027 预测。可直接打开。",repo:"ai-expansion-analysis"},
+ {n:"wildera",ln:"D",vis:"pri",lvl:"mid",lk:"wildera",tech:["Vite","Babylon.js 8","WebGPU","Havok"],title:"3D 开放世界生存建造",desc:"类英灵神殿，无限程序化大世界。Babylon 8 WebGPU + Havok 真启用，架构最完整。",repo:"wildera"},
+ {n:"future-world-3055",ln:"D",vis:"pri",lvl:"mid",lk:"future-world-3055",tech:["Vite","Babylon.js 7","ECS"],title:"3055 星河文明 3D 模拟",desc:"大型科幻模拟世界，严格 ECS 架构（18+ 系统）。Havok 半接入待修。",repo:"future-world-3055"},
+ {n:"taixu-dao-world",ln:"D",vis:"pri",lvl:"mid",lk:"taixu-dao-world",tech:["Vite","Three.js","Bloom"],title:"太虚万象录 · 仙侠修真",desc:"浏览器 3D 仙侠开放世界，三界九域、御剑飞行。16 个系统，技术原型。",repo:"taixu-dao-world"},
+ {n:"modelstudio",ln:"D",vis:"pri",lvl:"mid",tech:["Python","Fastify","React","Three.js"],title:"2D→3D 模型生成编辑器",desc:"图片生成 3D 模型 + 网格编辑器。三层架构，M1-M3 完成（双轨 AI + 编辑器）。",repo:"modelstudio"},
+ {n:"大模型研究",ln:"E",vis:"pri",lvl:"high",tech:["Markdown","PyTorch"],title:"大模型研究笔记",desc:"23 篇理论文档 + 22 个可运行 PyTorch 代码模块（attention/diffusion/rl/interp）。",repo:"llm-research-notes"},
+ {n:"tiny-edge-models",ln:"E",vis:"pri",lvl:"mid",tech:["research.md","Python"],title:"端侧模型调研+训练框架",desc:"KB→GB 规模阶梯调研 + edge_trainer 训练框架 + benchmark。",repo:"tiny-edge-models"},
+ {n:"agenttrain",ln:"E",vis:"pub",lvl:"mid",lk:"agenttrain",tech:["Vite","TypeScript","Canvas 2D"],title:"Mini Metro 风调度游戏",desc:"画线连接站点的火车调度小游戏。含 AI 顾问/自动驾驶层，纯函数式逻辑可测。",repo:"agenttrain"},
+ {n:"platform-demo",ln:"F",vis:"pri",lvl:"low",tech:["JSON契约","Node"],title:"三平台集成胶水",desc:"cogent+agentloop+e2e-fusion 的产品契约 + 垂直切片证据。非独立项目。",repo:"platform-demo"},
+ {n:"pastoral-travel",ln:"F",vis:"pri",lvl:"mid",tech:["Godot 4.7","Node","Python"],title:"田园旅行记手游",desc:"拍照+AI识别+村庄建设治愈手游。已出 3 个 Android APK，设计文档最齐。",repo:"pastoral-travel"},
+ // G. 哲学 / 文化 / 能力增强
+ {n:"logos-formal",ln:"G",vis:"pri",lvl:"mid",tech:["Lean 4"],title:"形式化哲学证明库",desc:"用 Lean 4 把哲学论证形式化为机器可检查的证明（三段论/模态逻辑/形式化伦理）。",repo:"logos-formal"},
+ {n:"logos-sim",ln:"G",vis:"pri",lvl:"mid",tech:["TypeScript","零依赖"],title:"哲学场景确定性模拟",desc:"哲学思想实验（囚徒困境/无知之幕）的可复现仿真引擎。",repo:"logos-sim"},
+ {n:"poetry-garden",ln:"G",vis:"pri",lvl:"mid",tech:["Vite","TypeScript","Canvas"],title:"丹青诗境 · 古诗词鉴赏",desc:"为精选古诗词增添色彩与意境的精美鉴赏应用，含双层等级系统。",repo:"poetry-garden"},
+ {n:"wuwan",ln:"G",vis:"pub",lvl:"high",tech:["HTML/CSS/JS","Python生成器"],title:"金无足赤 · 中文谚语长卷",desc:"2000 个静态谚语页的中文文化站点，Python 批量生成，零框架。",repo:"wuwan"},
+ {n:"superpower-system",ln:"G",vis:"pri",lvl:"mid",tech:["Vite","TypeScript strict"],title:"超级能力增强系统",desc:"给「人」做的 RPG 化个人能力解锁面板，含独立 ReAct agent 教练。",repo:"superpower-system"},
+ // H. 硬核工程模拟与科幻
+ {n:"sky-carrier",ln:"H",vis:"pri",lvl:"mid",tech:["Vite","Babylon.js"],title:"飞天航母 · 硬科幻工程模拟",desc:"太空飞行器+星际飞船+作战体系的 1:1 全仿真硬科幻工程模型。物理先于尺寸。",repo:"sky-carrier"},
+ {n:"physics-sim",ln:"H",vis:"pri",lvl:"mid",tech:["Vite","Babylon.js","Havok"],title:"通用物理模拟器平台",desc:"从天体引力到微观粒子的统一架构。物理先于渲染——physics/ 是单一事实源。",repo:"physics-sim"},
+ {n:"fusion-power-3d",ln:"H",vis:"pri",lvl:"mid",tech:["Vite","Three.js"],title:"核聚变电站 3D 模拟",desc:"三种聚变方案完全独立模块化，各自可调参、各算各的物理。",repo:"fusion-power-3d"},
+ {n:"earth-history-3d",ln:"H",vis:"pri",lvl:"mid",tech:["Next.js","React"],title:"地球地质年代史",desc:"冥古宙→第四纪地质年代时间线（名含3d但实际是 React 页面，无3D）。",repo:"earth-history-3d"},
+ // I. Godot 手游线
+ {n:"city-hunt",ln:"I",vis:"pri",lvl:"mid",tech:["Godot 4.7","GDScript"],title:"CityHunt · GTA风城市射击",desc:"3D 开放世界城市动作射击：程序化体素城市、射击战斗、敌人AI、任务系统。手机端。",repo:"city-hunt"},
+ {n:"voxel-craft",ln:"I",vis:"pri",lvl:"mid",tech:["Godot 4.7","GDScript"],title:"VoxelCraft · 体素生存",desc:"手机 3D 我的世界风格体素生存游戏，程序化地形/方块建造/生物/合成。",repo:"voxel-craft"},
+ {n:"mobile-game-workflow",ln:"I",vis:"pri",lvl:"mid",tech:["Bash","GDScript","CI"],title:"Godot 手游构建工具集",desc:"build/keystore/deploy 脚本 + CI + 移动适配模板 + Android 插件。",repo:"mobile-game-workflow"},
+ // J. 研究/调研（文档型）
+ {n:"agent-coding-research",ln:"J",vis:"pri",lvl:"high",tech:["Markdown"],title:"AI 编程趋势研究",desc:"2025-2026 AI Agent Coding 领域调研，14 篇 md + AICon PPT 分析。",repo:"agent-coding-research"},
+ {n:"app-game-research",ln:"J",vis:"pri",lvl:"high",tech:["Markdown"],title:"手机游戏技术调研",desc:"市场/引擎横评/开源游戏/Godot 移动源码剖析，10 篇 md。",repo:"app-game-research"},
+ {n:"web-game-research",ln:"J",vis:"pri",lvl:"high",tech:["Markdown","Bash"],title:"Web 游戏引擎调研",desc:"引擎横评 + 21 游戏案例库 + 对工作区建议。纯研究项目。",repo:"web-game-research"},
+ {n:"on-device-llm",ln:"J",vis:"pri",lvl:"mid",tech:["Markdown","Python"],title:"端侧 LLM 部署实测",desc:"端侧大语言模型本地化部署的实测层+落地层。推理引擎实测/量化/选型矩阵。",repo:"on-device-llm"},
+];
+const LINE={A:"Agent / AI 基础设施",B:"AI 应用 / 研究 Agent",C:"技术教育与内容平台",D:"3D 游戏与虚拟世界",E:"研究 / 调研",F:"集成 / 元层",G:"哲学 / 文化 / 能力增强",H:"硬核工程模拟",I:"Godot 手游线",J:"研究文档"};
+const LVL={high:["高完成度","b-high"],mid:["中完成度","b-mid"],low:["早期/原型","b-low"]};
+let curFilter="all",curSearch="";
+function render(){
+  const cont=document.getElementById("cards");let html="";
+  ["A","B","C","D","E","F","G","H","I","J"].forEach(ln=>{
+    const items=projects.filter(p=>{
+      if(curFilter!=="all"&&p.ln!==curFilter)return false;
+      if(curSearch){const q=curSearch.toLowerCase();if(!(p.n+p.title+p.desc+p.tech.join(" ")).toLowerCase().includes(q))return false;}
+      return p.ln===ln;
+    });
+    if(!items.length)return;
+    html+=`<section class="section"><div class="sec-head"><h2>${LINE[ln]}</h2><span class="count">${items.length}</span><span class="bar"></span></div><div class="grid">`;
+    items.forEach(p=>{const lv=LVL[p.lvl];
+      const launchBtn = p.lk ? `<button class="launch-btn" data-key="${p.lk}" data-name="${p.n}">▶ 启动</button>` : '';
+      html+=`<article class="card">
+        <div class="c-head"><h3>${p.n}</h3><span class="badge ${lv[1]}">${lv[0]}</span></div>
+        <div class="c-title">${p.title}</div>
+        <div class="c-desc">${p.desc}</div>
+        <div class="stack">${p.tech.map(t=>`<span>${t}</span>`).join("")}</div>
+        <div class="c-foot">
+          <span class="vis ${p.vis==="pub"?"vis-pub":"vis-pri"}">${p.vis==="pub"?"🌐 公开":"🔒 私有"}</span>
+          <div class="c-actions"><a class="gh" href="${GH}/${p.repo}" target="_blank">GitHub ↗</a>${launchBtn}</div>
+        </div>
+      </article>`;
+    });
+    html+=`</div></section>`;
+  });
+  cont.innerHTML=html;
+}
+document.getElementById("search").addEventListener("input",e=>{curSearch=e.target.value;render();});
+document.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{
+  document.querySelectorAll(".chip").forEach(x=>x.classList.remove("active"));
+  c.classList.add("active");curFilter=c.dataset.f;render();
+}));
+render();
+
+/* ===== 一键启动：通过本地 launcher.mjs 启动项目，就绪后自动开新 tab ===== */
+const LAUNCHER = 'http://127.0.0.1:17888';
+
+// 启动状态提示（页面顶部 toast）
+function showToast(msg, type) {
+  let t = document.getElementById('launch-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'launch-toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.className = 'launch-toast ' + (type || 'info');
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, type === 'loading' ? 60000 : 4000);
+}
+
+// 检测 launcher 是否运行
+async function checkLauncher() {
+  try {
+    const r = await fetch(LAUNCHER + '/list');
+    return r.ok;
+  } catch { return false; }
+}
+
+// 启动项目（start 立即返回，前端轮询 /status 直到 ready 再开 tab）
+async function launchProject(key, name, btn) {
+  const alive = await checkLauncher();
+  if (!alive) {
+    showToast('⚠ 启动器未运行。请先在终端执行：node launcher.mjs', 'error');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '⏳ 启动中…';
+  showToast('正在启动 ' + name + ' …（首次需 npm install + 编译，可能要几十秒）', 'loading');
+  try {
+    // 1. 发起启动（立即返回 starting）
+    const r = await fetch(LAUNCHER + '/start?key=' + encodeURIComponent(key), { method: 'POST' });
+    const data = await r.json();
+    if (!data.ok) {
+      btn.disabled = false; btn.textContent = '▶ 启动';
+      showToast('启动失败：' + (data.error || '未知'), 'error');
+      return;
+    }
+    const url = data.url;
+    // 2. 已经就绪（如已在运行）
+    if (data.status === 'ready' && url) {
+      btn.textContent = '✓ 运行中'; btn.classList.add('running');
+      showToast('✓ ' + name + ' 已就绪，正在打开新标签页…', 'success');
+      window.open(url, '_blank');
+      return;
+    }
+    // 3. CLI/无端口项目
+    if (data.note && !data.port) {
+      btn.textContent = '✓ 已启动'; btn.classList.add('running');
+      showToast('✓ ' + name + '：' + data.note, 'success');
+      return;
+    }
+    // 4. 轮询 /status 直到 ready（最多 90 秒）
+    const pollStart = Date.now();
+    const poll = async () => {
+      if (Date.now() - pollStart > 90000) {
+        btn.textContent = '⚠ 超时'; btn.disabled = false;
+        showToast(name + ' 启动超时（90秒）。可能仍在编译，稍后手动访问 ' + url, 'info');
+        return;
+      }
+      try {
+        const sr = await fetch(LAUNCHER + '/status?key=' + encodeURIComponent(key));
+        const sd = await sr.json();
+        if (sd.status === 'ready') {
+          btn.textContent = '✓ 运行中'; btn.classList.add('running');
+          showToast('✓ ' + name + ' 已就绪，正在打开新标签页…', 'success');
+          window.open(url, '_blank');
+        } else if (sd.status === 'stopped') {
+          btn.textContent = '✗ 已停止'; btn.disabled = false;
+          showToast(name + ' 进程已退出。检查终端日志。', 'error');
+        } else {
+          btn.textContent = '⏳ 编译中…';
+          setTimeout(poll, 2500);
+        }
+      } catch { setTimeout(poll, 2500); }
+    };
+    setTimeout(poll, 2500);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '▶ 启动';
+    showToast('请求启动器失败：' + e.message, 'error');
+  }
+}
+
+// 事件委托：点击启动按钮
+document.getElementById('cards').addEventListener('click', (e) => {
+  const btn = e.target.closest('.launch-btn');
+  if (!btn) return;
+  launchProject(btn.dataset.key, btn.dataset.name, btn);
+});
+</script>
+</body>
+</html>
