@@ -9,7 +9,7 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：32 个项目相互�
 
 ---
 
-## 二、项目总表（33 个）
+## 二、项目总表（35 个）
 
 ### A. Agent / AI 基础设施线（7 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
@@ -46,12 +46,15 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：32 个项目相互�
 | [`taixu-dao-world`](./taixu-dao-world) | Vite + TS + Three.js | 太虚万象录：浏览器 3D 仙侠修真开放世界 | 中高（44文件） |
 | [`modelstudio`](./modelstudio) | Python + Node + React+Three.js | 2D→3D 模型生成与网格编辑器（M1-M3完成） | 中高（三层架构） |
 
-### E. 研究 / 调研（3 个）
+### E. 研究 / 调研（5 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
 |------|--------|------|--------|
 | [`大模型研究`](./大模型研究) | Markdown + PyTorch | 大模型/DLM 研究笔记（23篇理论+22代码模块） | 高 |
+| [`ai-world-research`](./ai-world-research) | 纯 Markdown | AI 大力发展后社会/经济影响的思想实验集（8篇，与 ai-expansion-analysis 互补） | 高（首版8篇完整） |
 | [`tiny-edge-models`](./tiny-edge-models) | research.md + HTML + Python | 端侧/微小模型调研 + edge_trainer 训练框架 | 中高 |
 | [`agenttrain`](./agenttrain) | Vite + TS Canvas | Mini Metro 风火车调度游戏（+AI 顾问/自动驾驶） | 中高（18文件/7测试） |
+| [`web-standards-research`](./web-standards-research) | MD + HTML/JS + Python + Wasm | 现代化 Web 标准横评（**30 标准**：3 批 × 各 5 主题——平台新能力/平台基础/现代UI-CSS/PWA/硬件/安全，含 30 个详细可运行 demo）+ **Web 平台演进深度报告**（598 行，含标准化机制/浏览器话语权/Interop/Baseline） | 高（30档案+30 demo+深度报告） |
+| [`chinese-philosophy-research`](./chinese-philosophy-research) | TS + Hono + better-sqlite3 | 中国儒释道发展研究 agent（内置经典语料 + ReAct 研究 + 对话问答 + 多视角报告） | 初版（M1 进行中） |
 
 ### F. 集成 / 元层（2 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
@@ -129,6 +132,17 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：32 个项目相互�
 | `project-overview.html` | 工作区项目梳理 HTML 展示页 |
 | `scripts/` | 3 个 .mjs 校验脚本（platform/product portfolio check） |
 | `.portfolio/` | 产品状态快照 JSON |
+
+### 3.1 研究资产（根目录，基于真实代码核实 + 行业对标）
+| 文档 | 作用 |
+|-----------|------|
+| [`GAME_ENGINE_RESEARCH.md`](./GAME_ENGINE_RESEARCH.md) | Web 游戏引擎选型（基于 7 个项目代码核实 + 2026 行业现状） |
+| [`3D_MODELING_RESEARCH.md`](./3D_MODELING_RESEARCH.md) | **低成本 3D 建模方案**（基于 8 个 3D 项目代码核实 + 2026 业界 AI 建模/CC0/摄影测量/Blender GN 全景） |
+
+### 3.2 AI 介入孪生篇
+- `ai-expansion-analysis`（C 类，数据仪表盘）回答 **"AI 现在渗透多深"**：18 领域 × L0–L4 × 2018–2027 的可视化分析站，含动态评估引擎。
+- `ai-world-research`（E 类，叙事推演）回答 **"AI 之后世界会怎样"**：8 篇思想实验（就业/经济/权力/真相/意义/风险/终局），立足 2026 推演 2026–2040。
+- 同主题不同切面，可交叉引用：前者提供现状数据底盘，后者提供未来推演叙事。
 
 ### 4. AGENTS.md 覆盖现状
 已有顶层 AGENTS.md（13 个）：agentapp / agentloop / agentresearch / agenttrain / dashan / kids-games / modelstudio / logos-formal / logos-sim / poetry-garden / sky-carrier / physics-sim / fusion-power-3d。

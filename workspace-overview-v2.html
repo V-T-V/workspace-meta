@@ -179,11 +179,11 @@
     <h1>M_X_M 工作区</h1>
     <p class="sub">23 个独立项目，跨 6 条产品线——Agent 基础设施、3D 世界、技术教育与更多。</p>
     <div class="hero-stats">
-      <div class="hstat"><div class="num">39</div><div class="lab">项目</div></div>
-      <div class="hstat"><div class="num">10</div><div class="lab">产品线</div></div>
+      <div class="hstat"><div class="num">47</div><div class="lab">项目</div></div>
+      <div class="hstat"><div class="num">11</div><div class="lab">产品线</div></div>
       <div class="hstat"><div class="num">9</div><div class="lab">公开仓库</div></div>
-      <div class="hstat"><div class="num">14</div><div class="lab">高完成度</div></div>
-      <div class="hstat"><div class="num">4</div><div class="lab">游戏引擎</div></div>
+      <div class="hstat"><div class="num">17</div><div class="lab">高完成度</div></div>
+      <div class="hstat"><div class="num">5</div><div class="lab">游戏引擎</div></div>
     </div>
   </section>
 
@@ -201,6 +201,7 @@
       <button class="chip" data-f="H">工程模拟</button>
       <button class="chip" data-f="I">Godot 手游</button>
       <button class="chip" data-f="J">研究文档</button>
+      <button class="chip" data-f="K">Bevy 游戏</button>
     </div>
   </div>
 
@@ -224,14 +225,15 @@
     <h2><span class="ic">🎮</span> 游戏引擎技术栈</h2>
     <div class="rel-grid">
       <div class="rel-item"><div class="rh">Babylon.js · 严肃 3D</div><p>wildera（WebGPU+Havok 真启用）、future-world-3055（v7）、sky-carrier、physics-sim。渲染最强，物理内建。</p></div>
-      <div class="rel-item"><div class="rh">three.js · 3D 渲染</div><p>taixu-dao-world、modelstudio（R3F）、fusion-power-3d。灵活但只管渲染，做完整游戏需自补物理。</p></div>
+      <div class="rel-item"><div class="rh">three.js · 3D 渲染</div><p>taixu-dao-world、modelstudio（R3F）、fusion-power-3d、mesh-bridge。灵活但只管渲染。</p></div>
       <div class="rel-item"><div class="rh">Godot · 完整引擎</div><p>pastoral-travel / voxel-craft / city-hunt（4.7，含 mobile 渲染器）。可出 APK，含编辑器与多平台导出。</p></div>
+      <div class="rel-item"><div class="rh">Bevy · Rust ECS</div><p>space-shooter（3D 太空射击）、tower-defense（Roguelite 塔防）。Rust 原生 ECS，数据导向。</p></div>
       <div class="rel-item"><div class="rh">无引擎 · DOM/Canvas</div><p>agenttrain、kids-games（81 游戏）。零依赖加载极快，轻量 2D 最优解。</p></div>
     </div>
   </div>
 
   <footer>
-    M_X_M Workspace · 39 项目 · 10 产品线 · 数据基于代码核实（2026-07-20）<br>
+    M_X_M Workspace · 47 项目 · 11 产品线 · 数据基于代码核实（2026-07-21）<br>
     详见 <code>WORKSPACE_OVERVIEW.md</code> · <code>GAME_ENGINE_RESEARCH.md</code>
   </footer>
 </div>
@@ -273,6 +275,10 @@ const projects=[
  {n:"physics-sim",ln:"H",vis:"pri",lvl:"mid",tech:["Vite","Babylon.js","Havok"],title:"通用物理模拟器平台",desc:"从天体引力到微观粒子的统一架构。物理先于渲染——physics/ 是单一事实源。",repo:"physics-sim"},
  {n:"fusion-power-3d",ln:"H",vis:"pri",lvl:"mid",tech:["Vite","Three.js"],title:"核聚变电站 3D 模拟",desc:"三种聚变方案完全独立模块化，各自可调参、各算各的物理。",repo:"fusion-power-3d"},
  {n:"earth-history-3d",ln:"H",vis:"pri",lvl:"mid",tech:["Next.js","React"],title:"地球地质年代史",desc:"冥古宙→第四纪地质年代时间线（名含3d但实际是 React 页面，无3D）。",repo:"earth-history-3d"},
+ // K. Bevy/Rust 游戏
+ {n:"space-shooter",ln:"K",vis:"pri",lvl:"mid",tech:["Rust","Bevy 0.15"],title:"Space Shooter · 3D太空射击",desc:"Rust + Bevy ECS 3D 太空射击，Star Fox 风。",repo:"space-shooter"},
+ {n:"tower-defense",ln:"K",vis:"pri",lvl:"low",tech:["Rust","Bevy"],title:"Tower Defense · Roguelite塔防",desc:"Rust + Bevy ECS Roguelite 塔防，数据导向设计。",repo:"tower-defense"},
+ {n:"fog-explorer",ln:"K",vis:"pri",lvl:"low",tech:["Rust","Bevy"],title:"Bevy 探索实验",desc:"Bevy ECS 学习探索项目（无 README，早期实验）。",repo:"fog-explorer"},
  // I. Godot 手游线
  {n:"city-hunt",ln:"I",vis:"pri",lvl:"mid",tech:["Godot 4.7","GDScript"],title:"CityHunt · GTA风城市射击",desc:"3D 开放世界城市动作射击：程序化体素城市、射击战斗、敌人AI、任务系统。手机端。",repo:"city-hunt"},
  {n:"voxel-craft",ln:"I",vis:"pri",lvl:"mid",tech:["Godot 4.7","GDScript"],title:"VoxelCraft · 体素生存",desc:"手机 3D 我的世界风格体素生存游戏，程序化地形/方块建造/生物/合成。",repo:"voxel-craft"},
@@ -282,13 +288,19 @@ const projects=[
  {n:"app-game-research",ln:"J",vis:"pri",lvl:"high",tech:["Markdown"],title:"手机游戏技术调研",desc:"市场/引擎横评/开源游戏/Godot 移动源码剖析，10 篇 md。",repo:"app-game-research"},
  {n:"web-game-research",ln:"J",vis:"pri",lvl:"high",tech:["Markdown","Bash"],title:"Web 游戏引擎调研",desc:"引擎横评 + 21 游戏案例库 + 对工作区建议。纯研究项目。",repo:"web-game-research"},
  {n:"on-device-llm",ln:"J",vis:"pri",lvl:"mid",tech:["Markdown","Python"],title:"端侧 LLM 部署实测",desc:"端侧大语言模型本地化部署的实测层+落地层。推理引擎实测/量化/选型矩阵。",repo:"on-device-llm"},
+ {n:"ai-world-research",ln:"J",vis:"pri",lvl:"high",tech:["Markdown"],title:"AI 介入世界 · 叙事推演",desc:"AI 大力发展之后世界会怎样？8 篇社会/经济/权力/知识/意义推演。",repo:"ai-world-research"},
+ {n:"language-research",ln:"J",vis:"pri",lvl:"high",tech:["Markdown"],title:"AI 原生语言能力边界",desc:"Rust/Go/Python/TS 六层 AI 系统分层共生横评。",repo:"language-research"},
+ {n:"web-standards-research",ln:"J",vis:"pri",lvl:"high",tech:["Markdown","HTML/JS","Wasm"],title:"Web 标准横评（30标准）",desc:"30 个现代化 Web 标准三批横评，每个配套可运行 demo + 演进深度报告。",repo:"web-standards-research"},
+ // 补充到 A 组
+ {n:"chinese-philosophy-research",ln:"A",vis:"pri",lvl:"mid",tech:["TypeScript","Hono","better-sqlite3"],title:"中国儒释道研究 agent",desc:"用 ReAct 循环让 agent 引经据典而非凭空作答。内置经典语料 + 多视角报告。",repo:"chinese-philosophy-research"},
+ {n:"mesh-bridge",ln:"D",vis:"pri",lvl:"mid",tech:["TypeScript","React","Three.js"],title:"3D 建模聚合平台",desc:"一个入口整合云 API、CC0 资产、本地桥接、多 provider 对比。",repo:"mesh-bridge"},
 ];
-const LINE={A:"Agent / AI 基础设施",B:"AI 应用 / 研究 Agent",C:"技术教育与内容平台",D:"3D 游戏与虚拟世界",E:"研究 / 调研",F:"集成 / 元层",G:"哲学 / 文化 / 能力增强",H:"硬核工程模拟",I:"Godot 手游线",J:"研究文档"};
+const LINE={A:"Agent / AI 基础设施",B:"AI 应用 / 研究 Agent",C:"技术教育与内容平台",D:"3D 游戏与虚拟世界",E:"研究 / 调研",F:"集成 / 元层",G:"哲学 / 文化 / 能力增强",H:"硬核工程模拟",I:"Godot 手游线",J:"研究文档",K:"Bevy/Rust 游戏"};
 const LVL={high:["高完成度","b-high"],mid:["中完成度","b-mid"],low:["早期/原型","b-low"]};
 let curFilter="all",curSearch="";
 function render(){
   const cont=document.getElementById("cards");let html="";
-  ["A","B","C","D","E","F","G","H","I","J"].forEach(ln=>{
+  ["A","B","C","D","E","F","G","H","I","J","K"].forEach(ln=>{
     const items=projects.filter(p=>{
       if(curFilter!=="all"&&p.ln!==curFilter)return false;
       if(curSearch){const q=curSearch.toLowerCase();if(!(p.n+p.title+p.desc+p.tech.join(" ")).toLowerCase().includes(q))return false;}

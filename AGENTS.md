@@ -5,7 +5,7 @@
 > **完整梳理（含关联关系图、优先级、状态）见 [`WORKSPACE_OVERVIEW.md`](./WORKSPACE_OVERVIEW.md)。**
 > 进入任何子项目前，先读它的 `AGENTS.md`（部分已有，其余待补）。
 
-## 项目导航（34 个，按产品线分组）
+## 项目导航（35 个，按产品线分组）
 
 ### A. Agent / AI 基础设施
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
@@ -45,6 +45,7 @@
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
 |------|--------|--------|-----------|
 | [`大模型研究`](./大模型研究) | MD + PyTorch | 大模型研究笔记（23理论+22代码） | [→](./大模型研究/AGENTS.md) |
+| [`ai-world-research`](./ai-world-research) | MD 研究资产 | AI 大力发展后社会/经济影响思想实验集（8 篇，ai-expansion-analysis 的孪生叙事篇） | [→](./ai-world-research/AGENTS.md) |
 | [`tiny-edge-models`](./tiny-edge-models) | MD + HTML + Python | 端侧模型调研+训练框架 | [→](./tiny-edge-models/AGENTS.md) |
 | [`agenttrain`](./agenttrain) | Vite + TS Canvas | Mini Metro 风调度游戏(+AI顾问) | [→](./agenttrain/AGENTS.md) |
 
@@ -79,6 +80,8 @@
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
 |------|--------|--------|-----------|
 | [`web-game-research`](./web-game-research) | MD + CSV + bash/node 脚本 | Web 游戏引擎与开源游戏研究（调研项目，含样本 clone） | [→](./web-game-research/AGENTS.md) |
+| [`web-standards-research`](./web-standards-research) | MD + HTML/JS + Python + Wasm | 现代化 Web 标准横评（**30 标准**：3 批 × 各 5 主题，含 30 个详细可运行 demo）+ **Web 平台演进深度报告**（598 行，含标准化机制/浏览器话语权/Interop/Baseline） | [→](./web-standards-research/AGENTS.md) |
+| [`chinese-philosophy-research`](./chinese-philosophy-research) | TS + Hono + better-sqlite3 | 中国儒释道发展研究 agent（内置经典语料 + ReAct 研究 + 多视角报告） | [→](./chinese-philosophy-research/AGENTS.md) |
 
 ## 关键关联（详见 WORKSPACE_OVERVIEW.md）
 - **cogent → 依赖 → agentloop**：编译蓝图为 agentloop 的 runLoop() 调用（唯一强代码依赖）
@@ -87,6 +90,8 @@
 - **wildera / future-world-3055** 同用 Babylon.js（可互鉴引擎）
 - **Godot 手游线**：app-game-research（调研）→ mobile-game-workflow（构建工具）→ voxel-craft / pastoral-travel（真游戏）；app-game-research 依赖 godot-src（Godot 引擎源码副本，非工作区项目）做源码剖析
 - **logos 三件套**：logos-formal（Lean 形式化证明）/ logos-sim（确定性模拟）/ dashan（哲学对话）覆盖哲学的证明—模拟—对话三态
+- **哲学三态扩展**：logos-formal/sim + dashan（哲学对话）↔ chinese-philosophy-research（三教历史/学理研究 + 经典检索 agent）
+- **AI 介入孪生篇**：`ai-expansion-analysis`（数据仪表盘——现在渗透多深）↔ `ai-world-research`（叙事推演——之后世界会怎样），同主题不同切面，可交叉引用
 - **web-game-research** 是纯研究项目，为 7 个游戏项目提供外部引擎选型参照
 - 其余项目相互独立
 
@@ -96,5 +101,6 @@
 ## 工作区约定
 - 各项目独立运行，**不要跨项目改代码**除非明确要求。
 - 根目录有产品化管理元层：`*.md` 规划文档 + `scripts/` 校验脚本 + `.portfolio/` 状态快照。
+- 根目录有研究资产文档：[`GAME_ENGINE_RESEARCH.md`](./GAME_ENGINE_RESEARCH.md)（游戏引擎选型）、[`3D_MODELING_RESEARCH.md`](./3D_MODELING_RESEARCH.md)（低成本 3D 建模方案），均基于真实代码核实 + 行业对标，进入 3D/游戏子项目前可先读。
 - 根目录无 workspace/monorepo 配置；现有根 `package.json` 仅含独立 Havok 依赖，不作为统一依赖管理入口。
 - 多数 TS 项目：Node ≥ 20.19，ESM，TS 严格，`node --test`，ESLint + Prettier。

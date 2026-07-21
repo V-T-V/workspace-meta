@@ -59,3 +59,13 @@ package-lock.json
 NEW_PROJECTS_REVIEW_*.md
 # 站点设计选项（草稿）
 .sites-design-options/
+
+# 新增项目（持续追加）
+mesh-bridge/
+chinese-philosophy-research/
+ai-world-research/
+fog-explorer/
+language-research/
+space-shooter/
+tower-defense/
+web-standards-research/
