@@ -11,7 +11,7 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：32 个项目相互�
 
 ## 二、项目总表（35 个）
 
-### A. Agent / AI 基础设施线（7 个）
+### A. Agent / AI 基础设施线（8 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
 |------|--------|------|--------|
 | [`agentloop`](./agentloop) | TS，零运行时依赖 | Agent 主循环执行内核（10+ 能力全落地） | 高（47文件/33测试） |
@@ -21,6 +21,7 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：32 个项目相互�
 | [`agentresearch`](./agentresearch) | TS，零运行时依赖 | 可运行 ReAct Agent + 研究笔记仓库 | 高（25测试） |
 | [`tripplan`](./tripplan) | Vite + TS + 高德 AMap | 旅行规划 Agent（可变行程状态 + 多方案迭代） | 中高 |
 | [`stock-ai`](./stock-ai) | TS，零依赖内核 | 跨市场 ReAct Agent（技术面+基本面+舆情+回测） | 中高（36文件） |
+| [`go-rmm`](./go-rmm) | Go 1.22+ | 远程自动化执行平台（反向WS中继+Win Agent服务化+6类任务执行器） | 高（P0完成，32文件/9测试/三组件全链路打通） |
 
 ### B. AI 应用 / 研究 Agent（3 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
@@ -53,7 +54,7 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：32 个项目相互�
 | [`ai-world-research`](./ai-world-research) | 纯 Markdown | AI 大力发展后社会/经济影响的思想实验集（8篇，与 ai-expansion-analysis 互补） | 高（首版8篇完整） |
 | [`tiny-edge-models`](./tiny-edge-models) | research.md + HTML + Python | 端侧/微小模型调研 + edge_trainer 训练框架 | 中高 |
 | [`agenttrain`](./agenttrain) | Vite + TS Canvas | Mini Metro 风火车调度游戏（+AI 顾问/自动驾驶） | 中高（18文件/7测试） |
-| [`web-standards-research`](./web-standards-research) | MD + HTML/JS + Python + Wasm | 现代化 Web 标准横评（**30 标准**：3 批 × 各 5 主题——平台新能力/平台基础/现代UI-CSS/PWA/硬件/安全，含 30 个详细可运行 demo）+ **Web 平台演进深度报告**（598 行，含标准化机制/浏览器话语权/Interop/Baseline） | 高（30档案+30 demo+深度报告） |
+| [`web-standards-research`](./web-standards-research) | MD + HTML/JS + Python + Wasm | 现代化 Web 标准横评（**30 标准**：3 批 × 各 5 主题）含 30 个详细可运行 demo（含 4 个🆕进阶版：WebGPU 粒子/Next.js/多人会议/Sobel） + **30 份深度剖析档案**（每标准一份）+ **Web 平台演进深度报告**（598 行） | 高（30档案+30深挖+30 demo+4进阶+深度报告） |
 | [`chinese-philosophy-research`](./chinese-philosophy-research) | TS + Hono + better-sqlite3 | 中国儒释道发展研究 agent（内置经典语料 + ReAct 研究 + 对话问答 + 多视角报告） | 初版（M1 进行中） |
 
 ### F. 集成 / 元层（2 个）

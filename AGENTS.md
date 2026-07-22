@@ -5,7 +5,7 @@
 > **完整梳理（含关联关系图、优先级、状态）见 [`WORKSPACE_OVERVIEW.md`](./WORKSPACE_OVERVIEW.md)。**
 > 进入任何子项目前，先读它的 `AGENTS.md`（部分已有，其余待补）。
 
-## 项目导航（35 个，按产品线分组）
+## 项目导航（36 个，按产品线分组）
 
 ### A. Agent / AI 基础设施
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
@@ -17,6 +17,7 @@
 | [`agentresearch`](./agentresearch) | TS 零依赖 | ReAct Agent + 研究笔记 | [→](./agentresearch/AGENTS.md) |
 | [`tripplan`](./tripplan) | Vite + TS + 高德 | 旅行规划 Agent | [→](./tripplan/AGENTS.md) |
 | [`stock-ai`](./stock-ai) | TS 零依赖 | 跨市场 ReAct Agent | [→](./stock-ai/AGENTS.md) |
+| [`go-rmm`](./go-rmm) | Go 1.22+ | 远程自动化执行平台（反向WS中继+Win Agent服务化+6类任务执行器） | [→](./go-rmm/AGENTS.md) |
 
 ### B. AI 应用 / 研究 Agent
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
@@ -80,7 +81,7 @@
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
 |------|--------|--------|-----------|
 | [`web-game-research`](./web-game-research) | MD + CSV + bash/node 脚本 | Web 游戏引擎与开源游戏研究（调研项目，含样本 clone） | [→](./web-game-research/AGENTS.md) |
-| [`web-standards-research`](./web-standards-research) | MD + HTML/JS + Python + Wasm | 现代化 Web 标准横评（**30 标准**：3 批 × 各 5 主题，含 30 个详细可运行 demo）+ **Web 平台演进深度报告**（598 行，含标准化机制/浏览器话语权/Interop/Baseline） | [→](./web-standards-research/AGENTS.md) |
+| [`web-standards-research`](./web-standards-research) | MD + HTML/JS + Python + Wasm | 现代化 Web 标准横评（**30 标准**：3 批 × 各 5 主题）含 30 个详细可运行 demo（含 4 个🆕进阶版：WebGPU 粒子/Next.js/多人会议/Sobel）+ **30 份深度剖析档案**（每标准一份）+ **Web 平台演进深度报告**（598 行） | [→](./web-standards-research/AGENTS.md) |
 | [`chinese-philosophy-research`](./chinese-philosophy-research) | TS + Hono + better-sqlite3 | 中国儒释道发展研究 agent（内置经典语料 + ReAct 研究 + 多视角报告） | [→](./chinese-philosophy-research/AGENTS.md) |
 
 ## 关键关联（详见 WORKSPACE_OVERVIEW.md）
