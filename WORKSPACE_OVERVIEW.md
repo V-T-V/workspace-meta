@@ -5,13 +5,13 @@
 
 ## 一、工作区性质
 
-D:\M_X_M 是一个**多项目工作区，不是 monorepo**：32 个项目相互独立，无统一依赖管理、无 workspace 配置。每个项目有自己的技术栈、运行方式。根目录另有产品化管理元层（规划/状态文档 + 校验脚本）。
+D:\M_X_M 是一个**多项目工作区，不是 monorepo**：33 个项目相互独立，无统一依赖管理、无 workspace 配置。每个项目有自己的技术栈、运行方式。根目录另有产品化管理元层（规划/状态文档 + 校验脚本）。
 
 ---
 
-## 二、项目总表（35 个）
+## 二、项目总表（36 个）
 
-### A. Agent / AI 基础设施线（8 个）
+### A. Agent / AI 基础设施线（9 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
 |------|--------|------|--------|
 | [`agentloop`](./agentloop) | TS，零运行时依赖 | Agent 主循环执行内核（10+ 能力全落地） | 高（47文件/33测试） |
@@ -21,7 +21,8 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：32 个项目相互�
 | [`agentresearch`](./agentresearch) | TS，零运行时依赖 | 可运行 ReAct Agent + 研究笔记仓库 | 高（25测试） |
 | [`tripplan`](./tripplan) | Vite + TS + 高德 AMap | 旅行规划 Agent（可变行程状态 + 多方案迭代） | 中高 |
 | [`stock-ai`](./stock-ai) | TS，零依赖内核 | 跨市场 ReAct Agent（技术面+基本面+舆情+回测） | 中高（36文件） |
-| [`go-rmm`](./go-rmm) | Go 1.22+ | 远程自动化执行平台（反向WS中继+Win Agent服务化+6类任务执行器） | 高（P0完成，32文件/9测试/三组件全链路打通） |
+| [`go-rmm`](./go-rmm) | Go 1.22+ | 远程自动化执行平台（反向WS中继+Win Agent服务化+6类任务执行器） | 很高（P3完成，58文件/14测试/28commit，4轮优化：mTLS+CA+持久化+状态机+reaper+审计） |
+| [`auto-finance-assistant`](./auto-finance-assistant) | Go 1.25 + Vue 3 + SQLite + Ollama | 汽车金融本地智能客服（单EXE+FAQ短路+FTS/向量RAG+金融计算+服务化） | 高（M1-M9全完成，CPU闭环验证，65Go文件+7Vue文件/9测试全绿） |
 
 ### B. AI 应用 / 研究 Agent（3 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
