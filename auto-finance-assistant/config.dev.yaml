@@ -11,7 +11,7 @@ server:
 
 ollama:
   base_url: http://127.0.0.1:11434
-  chat_model: qwen2.5:1.5b          # CPU 验证用小模型
+  chat_model: qwen2.5:1.5b
   embedding_model: nomic-embed-text # M6 向量检索（专用 embedding 模型）
   request_timeout_seconds: 180      # CPU 慢，放宽超时
   keep_alive: 30m
