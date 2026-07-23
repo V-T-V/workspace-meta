@@ -18,6 +18,8 @@
 | [`tripplan`](./tripplan) | Vite + TS + 高德 | 旅行规划 Agent | [→](./tripplan/AGENTS.md) |
 | [`stock-ai`](./stock-ai) | TS 零依赖 | 跨市场 ReAct Agent | [→](./stock-ai/AGENTS.md) |
 | [`go-rmm`](./go-rmm) | Go 1.22+ | 远程自动化执行平台（反向WS中继+Win Agent服务化+6类任务执行器） | [→](./go-rmm/AGENTS.md) |
+| [`auto-finance-assistant`](./auto-finance-assistant) | Go 1.25 + Vue 3 + SQLite + Ollama | 汽车金融本地智能客服（单EXE+FAQ短路+FTS/向量RAG+金融计算+服务化，M1-M9全完成） | [→](./auto-finance-assistant/AGENTS.md) |
+| [`go-agent-research`](./go-agent-research) | Go 1.25 零依赖 | Agent 范式研究（29范式 + 4大深化基础设施：trace可观测/mockgen智能脚本/bench跨范式基准/llmadapt真实LLM适配 + 选型指南，含4个完整版重范式，纯标准库+Mock/Ollama） | [→](./go-agent-research/AGENTS.md) |
 
 ### B. AI 应用 / 研究 Agent
 | 项目 | 技术栈 | 一句话 | AGENTS.md |

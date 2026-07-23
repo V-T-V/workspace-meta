@@ -1,0 +1,36 @@
+;============================================================
+; kids-park — 儿童 3D 乐园探索 (Godot 4.7)
+;============================================================
+; 3-8 岁，动物森友会简化版：自由走动 → 拾取收集 → NPC 任务 → 贴纸奖励
+; 无惩罚/即时正反馈/零文字/简单触屏操作
+
+config_version=5
+
+[application]
+config/name="KidsPark"
+config/description="儿童 3D 乐园探索 - 采集/收集/任务"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+config/icon="res://icon.svg"
+
+[autoload]
+EventBus="*res://autoload/EventBus.gd"
+GameState="*res://autoload/GameState.gd"
+ParkGen="*res://autoload/ParkGen.gd"
+AudioBus="*res://autoload/AudioBus.gd"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/handheld/orientation=1
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[input_devices]
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.6, 0.85, 1.0, 1)

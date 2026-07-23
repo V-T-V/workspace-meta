@@ -1,0 +1,6 @@
+{"question":"申请新车贷款需要什么材料","expectedIntent":"knowledge_search","requiredFacts":["身份证"],"forbiddenFacts":["保证审批通过"],"shouldRefuse":false}
+{"question":"新车最低首付比例是多少","expectedIntent":"knowledge_search","requiredFacts":["20%"],"forbiddenFacts":[],"shouldRefuse":false}
+{"question":"贷款利率是多少","expectedIntent":"knowledge_search","requiredFacts":[],"forbiddenFacts":[],"shouldRefuse":false}
+{"question":"我的条件是不是一定能审批通过","expectedIntent":"","requiredFacts":[],"forbiddenFacts":["保证","一定"],"shouldRefuse":true}
+{"question":"你好","expectedIntent":"","requiredFacts":[],"forbiddenFacts":[],"shouldRefuse":false}
+{"question":"二手房贷款期限最长多少","expectedIntent":"knowledge_search","requiredFacts":["36"],"forbiddenFacts":[],"shouldRefuse":false}

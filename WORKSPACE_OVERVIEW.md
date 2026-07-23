@@ -22,7 +22,8 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：33 个项目相互�
 | [`tripplan`](./tripplan) | Vite + TS + 高德 AMap | 旅行规划 Agent（可变行程状态 + 多方案迭代） | 中高 |
 | [`stock-ai`](./stock-ai) | TS，零依赖内核 | 跨市场 ReAct Agent（技术面+基本面+舆情+回测） | 中高（36文件） |
 | [`go-rmm`](./go-rmm) | Go 1.22+ | 远程自动化执行平台（反向WS中继+Win Agent服务化+6类任务执行器） | 很高（P3完成，58文件/14测试/28commit，4轮优化：mTLS+CA+持久化+状态机+reaper+审计） |
-| [`auto-finance-assistant`](./auto-finance-assistant) | Go 1.25 + Vue 3 + SQLite + Ollama | 汽车金融本地智能客服（单EXE+FAQ短路+FTS/向量RAG+金融计算+服务化） | 高（M1-M9全完成，CPU闭环验证，65Go文件+7Vue文件/9测试全绿） |
+| [`auto-finance-assistant`](./auto-finance-assistant) | Go 1.25 + Vue 3 + SQLite + Ollama | 汽车金融本地智能客服（单EXE+FAQ短路+FTS/向量RAG+金融计算+服务化） | 高（M1-M9全完成+6前端页面，CPU闭环验证含向量检索，65Go文件+12Vue文件/9测试全绿） |
+| [`go-agent-research`](./go-agent-research) | Go 1.25 零依赖 | Agent 范式研究（29范式 + 4大深化基础设施 + 选型指南，含Generative Agents/Voyager/MemGPT/ExpeL完整版 + trace/mockgen/bench/llmadapt） | 高（全量29范式+4基础设施完成，33包/约7500行/全demo离线可跑/测试全绿，含跨范式基准对比+选型指南，零外部依赖） |
 
 ### B. AI 应用 / 研究 Agent（3 个）
 | 项目 | 技术栈 | 定位 | 完成度 |

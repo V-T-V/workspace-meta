@@ -1,0 +1,28 @@
+# 二进制
+bin/
+*.exe
+
+# 运行时配置（含密码，不入库；由 setup.ps1 从模板生成）
+config.yaml
+
+# 运行时数据（绝不入库）
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 前端构建产物（由 web/dist 经 go:embed 嵌入，不入库）
+# 保留占位 dist/index.html（tracked）确保新克隆可 go build
+web/node_modules/
+web/dist/
+internal/web/dist/assets/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
