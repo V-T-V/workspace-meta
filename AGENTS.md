@@ -5,7 +5,7 @@
 > **完整梳理（含关联关系图、优先级、状态）见 [`WORKSPACE_OVERVIEW.md`](./WORKSPACE_OVERVIEW.md)。**
 > 进入任何子项目前，先读它的 `AGENTS.md`（部分已有，其余待补）。
 
-## 项目导航（36 个，按产品线分组）
+## 项目导航（38 个，按产品线分组）
 
 ### A. Agent / AI 基础设施
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
@@ -20,6 +20,9 @@
 | [`go-rmm`](./go-rmm) | Go 1.22+ | 远程自动化执行平台（反向WS中继+Win Agent服务化+6类任务执行器） | [→](./go-rmm/AGENTS.md) |
 | [`auto-finance-assistant`](./auto-finance-assistant) | Go 1.25 + Vue 3 + SQLite + Ollama | 汽车金融本地智能客服（单EXE+FAQ短路+FTS/向量RAG+金融计算+服务化，M1-M9全完成） | [→](./auto-finance-assistant/AGENTS.md) |
 | [`go-agent-research`](./go-agent-research) | Go 1.25 零依赖 | Agent 范式研究（29范式 + 4大深化基础设施：trace可观测/mockgen智能脚本/bench跨范式基准/llmadapt真实LLM适配 + 选型指南，含4个完整版重范式，纯标准库+Mock/Ollama） | [→](./go-agent-research/AGENTS.md) |
+| [`rust-agent-research`](./rust-agent-research) | Rust 1.97 + tokio | go-agent-research 的 Rust 全量移植（26范式+底座，async/await+Arc+Cargo workspace，对齐Go版设计） | [→](./rust-agent-research/AGENTS.md) |
+| [`gpu-mesh`](./gpu-mesh) | Go 1.22+ | 异地分布式 GPU 算力调度平台（反向WS穿透NAT+Win服务化+GPU监控仪表盘+让位调度+Ollama/llama.cpp双引擎+OpenAI网关+GPU感知调度+批量Map-Reduce+LoRA训练+mTLS/审计/多租户，全6 Phase完成） | [→](./gpu-mesh/AGENTS.md) |
+| [`realtime-digital-human`](./realtime-digital-human) | Python 3.10 + FastAPI + asyncio | 单机实时数字人（ASR→LLM→TTS→唇形 流式管线重叠，首响应<1.5s，4060 8GB 可跑） | [→](./realtime-digital-human/AGENTS.md) |
 
 ### B. AI 应用 / 研究 Agent
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
@@ -57,6 +60,7 @@
 |------|--------|--------|-----------|
 | [`platform-demo`](./platform-demo) | JSON 契约 | cogent+agentloop+e2e-fusion 集成胶水 | [→](./platform-demo/AGENTS.md) |
 | [`pastoral-travel`](./pastoral-travel) | Godot + Node + Python | 田园旅行记手游（已出APK） | [→](./pastoral-travel/AGENTS.md) |
+| [`generic-admin`](./generic-admin) | Go 1.25 + Vue 3 + SQLite | 通用 schema-driven 管理后台（多导出器可插拔，给无后端项目接入） | [→](./generic-admin/AGENTS.md) |
 
 ### G. 新增内容与工程实验
 | 项目 | 技术栈 | 一句话 | AGENTS.md |
