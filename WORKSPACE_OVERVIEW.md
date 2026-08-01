@@ -1,6 +1,6 @@
 # M_X_M 工作区总览梳理
 
-> 更新日期：2026-07-25 · 本文档是工作区的**权威梳理**，覆盖所有项目、分类、状态与关联关系。
+> 更新日期：2026-07-31 · 本文档是工作区的**权威梳理**，覆盖所有项目、分类、状态与关联关系。
 > 各项目细节见其目录下的 `AGENTS.md`（部分项目已有，其余可按需补建）。
 
 ## 一、工作区性质
@@ -9,7 +9,9 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：33 个项目相互�
 
 ---
 
-## 二、项目总表（38 个）
+## 二、项目总表
+
+> 本表登记 A–F 线主要项目（G–J 组见第三章"新增项目专项梳理"）。实际工作区目录数以 `workspace-ops scan` 为准（当前约 60 个）。
 
 ### A. Agent / AI 基础设施线（10 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
@@ -24,21 +26,21 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：33 个项目相互�
 | [`go-rmm`](./go-rmm) | Go 1.22+ | 远程自动化执行平台（反向WS中继+Win Agent服务化+6类任务执行器） | 很高（P3完成，58文件/14测试/28commit，4轮优化：mTLS+CA+持久化+状态机+reaper+审计） |
 | [`auto-finance-assistant`](./auto-finance-assistant) | Go 1.25 + Vue 3 + SQLite + Ollama | 汽车金融本地智能客服（单EXE+FAQ短路+FTS/向量RAG+金融计算+服务化） | 高（M1-M9全完成+6前端页面，CPU闭环验证含向量检索，65Go文件+12Vue文件/9测试全绿） |
 | [`go-agent-research`](./go-agent-research) | Go 1.25 零依赖 | Agent 范式研究（29范式 + 4大深化基础设施 + 选型指南，含Generative Agents/Voyager/MemGPT/ExpeL完整版 + trace/mockgen/bench/llmadapt） | 高（全量29范式+4基础设施完成，33包/约7500行/全demo离线可跑/测试全绿，含跨范式基准对比+选型指南，零外部依赖） |
-| [`rust-agent-research`](./rust-agent-research) | Rust 1.97 + tokio | go-agent-research 的 Rust 全量移植（26范式+底座，async/await+Arc+Cargo workspace，对齐Go版设计） | 中（全量26范式完成：26 crate/约3000行/cargo test全绿/26 demo全跑通，覆盖13大家族，对齐Go版） |
+| [`rust-agent-research`](./rust-agent-research) | Rust 1.97 + tokio | go-agent-research 的 Rust 全量移植（26范式+9基础设施全对齐+3文档，全部完整实现，async/await+Arc+Cargo workspace） | 中（全量完成：37 crate/约5000行/cargo test全绿/30 demo/check+clippy双零warning/9/9基础设施对齐Go版/3份深度文档/8范式深化为完整trait实现/覆盖13大家族） |
 | [`realtime-digital-human`](./realtime-digital-human) | Python 3.10 + FastAPI + asyncio | 单机实时数字人（ASR→LLM→TTS→唇形 流式管线重叠，首响应<1.5s，4060 8GB 可跑） | 中高（MVP骨架完成：4环节引擎抽象+流式管线+WS+MJPEG推流+端到端集成测试全绿，56测试通过；真实ASR/唇形代码就位待GPU验证） |
 
 ### B. AI 应用 / 研究 Agent（3 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
 |------|--------|------|--------|
 | [`history-mist`](./history-mist) | TS + Hono + better-sqlite3 + OpenAI | 历史探索智能体（多源交叉验证+知识图谱+报告导出） | 高（42文件） |
-| [`dashan`](./dashan) | TS (Vite)，无运行时依赖 | "大善系统"哲学困境对话（web/server/cli 三态） | 高 |
+| [`dashan`](./dashan) | TS (Vite + Node)，无运行时依赖 | "大善系统"哲学困境对话（LLM困境+善恶簿+3结局+8分类收藏+统计里程碑+web/cli双形态） | 高（79测试） |
 | [`computer-use-rtc`](./computer-use-rtc) | Node + PowerShell + Win32 C# + GLM 视觉 | RTC 视频通话 E2E 自动化（截图→视觉识别→点击） | 中 |
 
 ### C. 技术教育与内容平台（5 个）
 | 项目 | 技术栈 | 定位 | 完成度 |
 |------|--------|------|--------|
 | [`algorithms-atlas`](./algorithms-atlas) | Vite + TS strict | 3000 算法图谱（trace 录制+动画播放器） | 很高（2629文件/334算法） |
-| [`kids-games`](./kids-games) | Vite + TS PWA | 3~6 岁儿童 81 个网页小游戏合集 | 很高（81游戏/10测试） |
+| [`kids-games`](./kids-games) | Vite + TS PWA | 3~6 岁儿童 529 个网页小游戏合集（30成就+自适应难度+PWA+家长报告+反馈系统） | 很高（529游戏/91测试） |
 | [`lightai`](./lightai) | Python 零依赖 + HTML | 轻量 AI 算法库（BM25/贝叶斯/MinHash 替代大模型） | 很高（101 .py/31页面） |
 | [`ai-expansion-analysis`](./ai-expansion-analysis) | 纯 HTML/CSS/JS | AI 扩张方向/深度/场景可视化分析站 | 高 |
 | [`superpower-system`](./superpower-system) | Vite + TS strict | 个人能力 RPG 化解锁面板（能力树+经验+独立 ReAct agent 教练） | 中（首版34测试全绿） |
@@ -57,7 +59,7 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：33 个项目相互�
 | [`大模型研究`](./大模型研究) | Markdown + PyTorch | 大模型/DLM 研究笔记（23篇理论+22代码模块） | 高 |
 | [`ai-world-research`](./ai-world-research) | 纯 Markdown | AI 大力发展后社会/经济影响的思想实验集（8篇，与 ai-expansion-analysis 互补） | 高（首版8篇完整） |
 | [`tiny-edge-models`](./tiny-edge-models) | research.md + HTML + Python | 端侧/微小模型调研 + edge_trainer 训练框架 | 中高 |
-| [`agenttrain`](./agenttrain) | Vite + TS Canvas | Mini Metro 风火车调度游戏（+AI 顾问/自动驾驶） | 中高（18文件/7测试） |
+| [`agenttrain`](./agenttrain) | Vite + TS Canvas | Mini Metro 风火车调度游戏（8倍大地图+摄像机+6道具插件化+20成就+音效+迷你地图+难度档+最高分+AI顾问/自驾+教程+视口剔除） | 高（35文件/208测试） |
 | [`web-standards-research`](./web-standards-research) | MD + HTML/JS + Python + Wasm | 现代化 Web 标准横评（**30 标准**：3 批 × 各 5 主题）含 30 个详细可运行 demo（含 4 个🆕进阶版：WebGPU 粒子/Next.js/多人会议/Sobel） + **30 份深度剖析档案**（每标准一份）+ **Web 平台演进深度报告**（598 行） | 高（30档案+30深挖+30 demo+4进阶+深度报告） |
 | [`chinese-philosophy-research`](./chinese-philosophy-research) | TS + Hono + better-sqlite3 | 中国儒释道发展研究 agent（内置经典语料 + ReAct 研究 + 对话问答 + 多视角报告） | 初版（M1 进行中） |
 
@@ -66,7 +68,7 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：33 个项目相互�
 |------|--------|------|--------|
 | [`platform-demo`](./platform-demo) | JSON 契约 + Node 校验 | cogent+agentloop+e2e-fusion 三平台集成演示（非独立项目） | 低（胶水层） |
 | [`pastoral-travel`](./pastoral-travel) | Godot 4.7 + Node + Python | 田园旅行记：拍照+AI识别+村庄建设手游 | 中高（已出3个APK） |
-| [`generic-admin`](./generic-admin) | Go 1.25 + Vue 3 + SQLite | 通用 schema-driven 管理后台（多导出器可插拔，给无后端项目接入；已验证 kids-games 515 条闭环） | M1 完成（初版） |
+| [`generic-admin`](./generic-admin) | Go 1.25 + Vue 3 + SQLite | 通用 schema-driven 管理后台（多导出器可插拔，给无后端项目接入；已验证 kids-games 529 条闭环） | M1 完成（初版） |
 
 ---
 
@@ -92,6 +94,21 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：33 个项目相互�
 | `fusion-power-3d` | Vite + TS + Three.js | 三类聚变路线、运行系统和方案对比已形成垂直产品 | P1 |
 | `physics-sim` | Vite + TS + Babylon.js + Havok | 通用物理场景容器，物理与渲染分离，适合作为科学模拟底座 | P1 |
 | `earth-history-3d` | vinext + React + Canvas 2D | 视觉成熟的地球历史内容原型，尚非真正 3D 或完整知识产品 | P2 |
+
+### 2026-08-01 新增：基础设施与工程工具线（3 个）
+
+详细梳理见 [NEW_PROJECTS_REVIEW_2026-08-01.md](./NEW_PROJECTS_REVIEW_2026-08-01.md)。
+
+| 项目 | 技术栈 | 当前判断 | 优先级 |
+|---|---|---|---|
+| `consensus-atlas` | Go 1.25 零依赖 | 补"分布式系统教学"空白，12 算法（Raft/Paxos/PBFT/Gossip/2PC/CRDT/拜占庭将军OM/快照/VR/ZAB 等）+ bench | P2 |
+| `workspace-ops` | Go + Vue + SQLite | 工作区自用工具（scan/report/serve/test 四子命令，扫描 60+ 项目，含实跑测试采集 + REST API） | P1 |
+| `flow-pipe` | Go + SQLite | 补"数据层/ETL"空白，11 连接器 + retry + 死信 + 状态恢复 + 定时调度 + REST API | P2 |
+| `lang-impl` | Go 1.25 零依赖 | 补"编译器/语言实现"空白，lex→parse→interpret + REPL + WASM后端（node验证 add(3,4)=7） | P2 |
+| `crypto-atlas` | Go 1.25 零依赖 | 补"安全/密码学教学"空白，10 算法（凯撒/维吉尼亚/XOR/AES/DES/SHA-256/MD5/RSA/DH/HMAC）5 件套 | P2 |
+| `regex-engine` | Go 1.25 零依赖 | 补"正则引擎"空白，Thompson NFA 抗ReDoS，Match/FindAll/ReplaceAll/分组捕获 | P2 |
+| `ai-safety-atlas` | Go 1.25 零依赖 | 补"AI 安全测试"空白，提示注入检测+多轮上下文分析+31红队用例+批量报告（P100%/R78.6%/F1=0.88） | P2 |
+| `obs-lite` | Go 1.25 零依赖 | 补"可观测性"空白，metrics+trace+HTTP /metrics（Prometheus scrape） | P2 |
 
 ## 四、项目间关联关系（核心）
 
@@ -153,7 +170,7 @@ D:\M_X_M 是一个**多项目工作区，不是 monorepo**：33 个项目相互�
 ### 3.3 通用管理后台接入（generic-admin）
 - `generic-admin`（F 类）是给**无后端项目**（纯前端 PWA / 静态站 / 无服务端工具）接入的 schema-driven 管理后台：定义 collection → 自动生成 CRUD API + 列表/表单 UI；多导出器可插拔（JSON / TypeScript 模块 / 运行时 API）。
 - **不耦合运行时**：被接入方保持原有部署形态（PWA 仍可离线、静态站仍是静态站）。generic-admin 只在开发/编辑期使用，导出产物被各项目打包进自己的构建。
-- **首个验证接入**：`kids-games`（515 条游戏元数据，原硬编码在 `src/games/registry.ts`）。已跑通完整闭环：导入 → 后台 CRUD → 导出 JSON/TS 落盘。其他类似项目（`algorithms-atlas`、`wuwan`、`poetry-garden` 等内容型项目）可同模式接入。
+- **首个验证接入**：`kids-games`（529 条游戏元数据，原硬编码在 `src/games/registry.ts`）。已跑通完整闭环：导入 → 后台 CRUD → 导出 JSON/TS 落盘。其他类似项目（`algorithms-atlas`、`wuwan`、`poetry-garden` 等内容型项目）可同模式接入。
 
 ### 4. AGENTS.md 覆盖现状
 已有顶层 AGENTS.md（13 个）：agentapp / agentloop / agentresearch / agenttrain / dashan / kids-games / modelstudio / logos-formal / logos-sim / poetry-garden / sky-carrier / physics-sim / fusion-power-3d。
