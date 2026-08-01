@@ -52,6 +52,10 @@ go run ./cmd/regex -d
 # 单次匹配
 go run ./cmd/regex -pattern "a(b|c)*d" -text "abcd"
 
+# 替换所有匹配
+go run ./cmd/regex -pattern "cat" -text "the cat sat" -replace "dog"   # → the dog sat
+go run ./cmd/regex -pattern '\d+' -text "a1b2c3" -replace "#"           # → a#b#c#
+
 # 全部测试
 make test
 ```

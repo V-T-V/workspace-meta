@@ -9,7 +9,7 @@
 //   - base64 编码的隐藏指令
 //   - 角色扮演诱导（"扮演一个没有限制的 AI"）
 //
-// 以上只是代表性示例。完整规则集见下方 rules 切片：共 20 条规则，
+// 以上只是代表性示例。完整规则集见下方 rules 切片：共 24 条规则，
 // 归入 6 个 types.AttackType 类别（多条规则可映射同一类别，详见每条规则的 Type 字段）。
 // 这些模式来自公开的越狱研究（如 DAN、JailbreakBench、garak）。
 package detector
@@ -31,7 +31,7 @@ type rule struct {
 	Suggestion string
 }
 
-// 规则集（共 20 条，按攻击类别组织）。多条规则可映射同一 types.AttackType。
+// 规则集（共 24 条，按攻击类别组织）。多条规则可映射同一 types.AttackType。
 // 注意：正则用 (?i) 做大小写不敏感匹配。
 var rules = []rule{
 	// ===== 角色覆盖 / 指令覆盖 =====
@@ -142,6 +142,28 @@ var rules = []rule{
 		Name: "markdown-injection", Type: types.AttackPromptInjection, Severity: types.SeverityLow,
 		Pattern:    regexp.MustCompile(`(?i)\[!\[.*\]\(.*\)\]\(javascript:|<img[^>]+onerror=|<script`),
 		Suggestion: "Markdown/XSS 注入，可能在渲染时执行（如 ChatGPT 共享链接）。",
+	},
+
+	// ===== URL / 钓鱼（数据外泄与恶意跳转）=====
+	{
+		Name: "suspicious-url-shortener", Type: types.AttackDataExfiltration, Severity: types.SeverityMedium,
+		Pattern:    regexp.MustCompile(`(?i)(bit\.ly|tinyurl|t\.co|goo\.gl|is\.gd|buff\.ly|rebrand\.ly)/[a-zA-Z0-9]+`),
+		Suggestion: "检测到短链接（可能隐藏真实目标，常用于钓鱼/恶意跳转）。",
+	},
+	{
+		Name: "url-with-credentials", Type: types.AttackDataExfiltration, Severity: types.SeverityHigh,
+		Pattern:    regexp.MustCompile(`(?i)https?://[^/\s:@]+:[^/\s:@]+@`),
+		Suggestion: "URL 含内嵌凭证（user:pass@host），可能用于凭证窃取或中间人。",
+	},
+	{
+		Name: "ip-as-host", Type: types.AttackDataExfiltration, Severity: types.SeverityMedium,
+		Pattern:    regexp.MustCompile(`(?i)https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`),
+		Suggestion: "URL 使用裸 IP 而非域名（常见于钓鱼/恶意软件 C2）。",
+	},
+	{
+		Name: "data-exfil-url", Type: types.AttackDataExfiltration, Severity: types.SeverityHigh,
+		Pattern:    regexp.MustCompile(`(?i)(webhook\.site|ngrok\.io|requestbin|pipedream|interactsh)`),
+		Suggestion: "检测到数据外泄服务 URL（用于接收被盗数据）。",
 	},
 }
 

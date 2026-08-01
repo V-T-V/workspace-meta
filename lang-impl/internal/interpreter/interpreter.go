@@ -377,6 +377,85 @@ func (itp *Interpreter) evalCall(e *core.CallExpr, env *Environment) (any, error
 		}
 		return nil, core.NewError(e.Loc, "len() 参数必须是数组或字符串，实际 %s", typeName(v))
 	}
+	// 内置函数 substr(str, start, end)：截取子串（rune 安全）
+	if e.Callee == "substr" && len(e.Args) == 3 {
+		s, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		start, err := itp.evalExpr(e.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		end, err := itp.evalExpr(e.Args[2], env)
+		if err != nil {
+			return nil, err
+		}
+		str, ok := s.(string)
+		if !ok {
+			return nil, core.NewError(e.Loc, "substr() 第一个参数必须是字符串，实际 %s", typeName(s))
+		}
+		si, ok1 := start.(int64)
+		ei, ok2 := end.(int64)
+		if !ok1 || !ok2 {
+			return nil, core.NewError(e.Loc, "substr() start/end 必须是整数")
+		}
+		runes := []rune(str)
+		if si < 0 {
+			si = 0
+		}
+		if ei > int64(len(runes)) {
+			ei = int64(len(runes))
+		}
+		if si >= ei {
+			return "", nil
+		}
+		return string(runes[si:ei]), nil
+	}
+	// 内置函数 charAt(str, index)：返回指定位置的单字符字符串
+	if e.Callee == "charAt" && len(e.Args) == 2 {
+		s, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		idx, err := itp.evalExpr(e.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		str, ok := s.(string)
+		if !ok {
+			return nil, core.NewError(e.Loc, "charAt() 第一个参数必须是字符串")
+		}
+		i, ok := idx.(int64)
+		if !ok {
+			return nil, core.NewError(e.Loc, "charAt() index 必须是整数")
+		}
+		runes := []rune(str)
+		if i < 0 || int(i) >= len(runes) {
+			return nil, core.NewError(e.Loc, "charAt() 索引越界: %d（长度 %d）", i, len(runes))
+		}
+		return string(runes[i]), nil
+	}
+	// 内置函数 push(arr, val)：向数组追加元素，返回新数组（不修改原数组）
+	if e.Callee == "push" && len(e.Args) == 2 {
+		arr, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		val, err := itp.evalExpr(e.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		a, ok := arr.([]any)
+		if !ok {
+			return nil, core.NewError(e.Loc, "push() 第一个参数必须是数组，实际 %s", typeName(arr))
+		}
+		// 返回新数组（不修改原数组）
+		out := make([]any, len(a)+1)
+		copy(out, a)
+		out[len(a)] = val
+		return out, nil
+	}
 	fn, ok := itp.funcs[e.Callee]
 	if !ok {
 		return nil, core.NewError(e.Loc, "未定义的函数 %q", e.Callee)

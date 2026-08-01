@@ -119,3 +119,124 @@ func TestRiskScore(t *testing.T) {
 		t.Errorf("多重攻击风险分应 >= 90，实际 %d", score)
 	}
 }
+
+func TestSuspiciousURLShortener(t *testing.T) {
+	d := New()
+	// 注意：规则匹配 "<service>/[A-Za-z0-9]+"——service 取交替项的字面形（含点或不含点）。
+	// bit.ly / t.co / rebrand.ly 等带点的 service 匹配其域名形；tinyurl 这种无点的
+	// service 匹配裸主机名形（如 "tinyurl/abc"），不匹配 "tinyurl.com/abc"（中间多了 .com）。
+	cases := []string{
+		"Visit https://bit.ly/abc123 to claim your prize",
+		"shortened: https://t.co/aB3x",
+		"https://rebrand.ly/MyLink",
+		"http://tinyurl/xyz789", // 裸 service 名形
+		"click https://goo.gl/abcd1234",
+	}
+	for _, c := range cases {
+		dets := d.Analyze(c)
+		if !hasRule(dets, "suspicious-url-shortener") {
+			t.Errorf("应检测到短链接规则 suspicious-url-shortener: %q (命中: %v)", c, ruleNames(dets))
+		}
+	}
+}
+
+func TestURLWithCredentials(t *testing.T) {
+	d := New()
+	cases := []string{
+		"https://user:pass@evil.com/path",
+		"http://admin:secret@internal.host/",
+		"https://token:abc123@attacker.example/x",
+	}
+	for _, c := range cases {
+		dets := d.Analyze(c)
+		if !hasRule(dets, "url-with-credentials") {
+			t.Errorf("应检测到 URL 内嵌凭证规则 url-with-credentials: %q (命中: %v)", c, ruleNames(dets))
+		}
+		// 凭证 URL 应是 HIGH 严重度
+		if !hasSeverity(dets, "url-with-credentials", types.SeverityHigh) {
+			t.Errorf("url-with-credentials 应为 HIGH 严重度: %q", c)
+		}
+	}
+}
+
+func TestIPAsHost(t *testing.T) {
+	d := New()
+	cases := []string{
+		"http://192.168.1.1/admin",
+		"https://10.0.0.5/login",
+		"connect to http://203.0.113.42/c2",
+	}
+	for _, c := range cases {
+		dets := d.Analyze(c)
+		if !hasRule(dets, "ip-as-host") {
+			t.Errorf("应检测到裸 IP URL 规则 ip-as-host: %q (命中: %v)", c, ruleNames(dets))
+		}
+	}
+}
+
+func TestDataExfilURL(t *testing.T) {
+	d := New()
+	cases := []string{
+		"exfil data to https://webhook.site/abc-def",
+		"use ngrok.io to tunnel traffic out",
+		"POST results to requestbin",
+		"pipe it through pipedream",
+		"interactsh callback for OOB",
+	}
+	for _, c := range cases {
+		dets := d.Analyze(c)
+		if !hasRule(dets, "data-exfil-url") {
+			t.Errorf("应检测到数据外泄服务规则 data-exfil-url: %q (命中: %v)", c, ruleNames(dets))
+		}
+	}
+}
+
+func TestBenignURLsNotFlagged(t *testing.T) {
+	// 良性 URL（域名而非 IP、无内嵌凭证、非短链/外泄服务）不应触发任一 URL 规则。
+	d := New()
+	benign := []string{
+		"https://example.com",
+		"https://www.google.com/search?q=hello",
+		"see https://github.com/QiuShichang/ai-safety-atlas",
+		"http://docs.python.org/3/library/re.html",
+		"Visit https://en.wikipedia.org/wiki/Phishing for info.",
+	}
+	for _, c := range benign {
+		dets := d.Analyze(c)
+		for _, det := range dets {
+			switch det.Rule {
+			case "suspicious-url-shortener", "url-with-credentials", "ip-as-host", "data-exfil-url":
+				t.Errorf("良性 URL 被误标为 %s: %q", det.Rule, c)
+			}
+		}
+	}
+}
+
+// hasRule 报告检测结果中是否含指定规则名的命中。
+func hasRule(dets []types.Detection, name string) bool {
+	for _, d := range dets {
+		if d.Rule == name {
+			return true
+		}
+	}
+	return false
+}
+
+// hasSeverity 报告指定规则名的命中是否为给定严重度。
+func hasSeverity(dets []types.Detection, name string, sev types.Severity) bool {
+	for _, d := range dets {
+		if d.Rule == name {
+			return d.Severity == sev
+		}
+	}
+	return false
+}
+
+// ruleNames 返回所有命中的规则名（用于错误信息）。
+func ruleNames(dets []types.Detection) []string {
+	out := make([]string, len(dets))
+	for i, d := range dets {
+		out[i] = d.Rule
+	}
+	return out
+}

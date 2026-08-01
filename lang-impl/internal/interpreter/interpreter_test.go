@@ -562,3 +562,48 @@ func TestNestedArray(t *testing.T) {
 		t.Error("m[1][0] 应为 3")
 	}
 }
+
+func TestSubstr(t *testing.T) {
+	if got := runString(t, `substr("hello world", 0, 5);`); got != "hello" {
+		t.Errorf(`substr("hello world",0,5) 应 "hello"，实际 %q`, got)
+	}
+	if got := runString(t, `substr("hello world", 6, 11);`); got != "world" {
+		t.Errorf(`substr("hello world",6,11) 应 "world"，实际 %q`, got)
+	}
+	// 越界自动钳制
+	if got := runString(t, `substr("abc", 0, 100);`); got != "abc" {
+		t.Errorf(`substr("abc",0,100) 应 "abc"，实际 %q`, got)
+	}
+	// 中文
+	if got := runString(t, `substr("你好世界", 0, 2);`); got != "你好" {
+		t.Errorf(`substr("你好世界",0,2) 应 "你好"，实际 %q`, got)
+	}
+}
+
+func TestCharAt(t *testing.T) {
+	if got := runString(t, `charAt("hello", 1);`); got != "e" {
+		t.Errorf(`charAt("hello",1) 应 "e"，实际 %q`, got)
+	}
+}
+
+func TestPush(t *testing.T) {
+	src := `let a = [1, 2]; let b = push(a, 3); return len(b);`
+	if runInt(t, src) != 3 {
+		t.Error("push 后数组长度应为 3")
+	}
+	// 原数组不被修改
+	src2 := `let a = [1, 2]; let b = push(a, 3); return len(a);`
+	if runInt(t, src2) != 2 {
+		t.Error("push 不应修改原数组")
+	}
+}
+
+func TestCharArrayMixed(t *testing.T) {
+	// 数组 + 字符串操作组合
+	src := `let parts = ["he", "llo"];
+let s = parts[0] + parts[1];
+return substr(s, 1, 4);`
+	if got := runString(t, src); got != "ell" {
+		t.Errorf("组合操作应 'ell'，实际 %q", got)
+	}
+}

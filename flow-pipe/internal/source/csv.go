@@ -53,9 +53,21 @@ func (CSVSource) Read(config map[string]any) (pipeline.Rows, error) {
 		return pipeline.Rows{}, nil
 	}
 
-	header := all[0]
-	rows := make(pipeline.Rows, 0, len(all)-1)
-	for _, rec := range all[1:] {
+	// header：默认第一行作为列名。若 config 提供 header（[]any），则用它作为列名，
+	// 且所有数据行都被解析（不跳过第一行）。适合无标题行的 CSV。
+	var header []string
+	dataStart := 1 // 默认跳过第一行（标题行）
+	if headerCfg, ok := config["header"].([]any); ok && len(headerCfg) > 0 {
+		for _, h := range headerCfg {
+			header = append(header, fmt.Sprintf("%v", h))
+		}
+		dataStart = 0 // 有自定义 header 时不跳过第一行
+	} else {
+		header = all[0]
+	}
+
+	rows := make(pipeline.Rows, 0, len(all)-dataStart)
+	for _, rec := range all[dataStart:] {
 		// 跳过全空行（csv.Reader 一般不会产生，但稳妥起见）
 		if len(rec) == 0 {
 			continue

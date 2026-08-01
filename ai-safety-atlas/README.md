@@ -23,15 +23,16 @@
 ## 核心能力
 
 ### 1. 提示注入 / 越狱检测（detector）
-检测 6 类攻击模式（`AttackType`），由 20 条规则覆盖：
+检测 6 类攻击模式（`AttackType`），由 24 条规则覆盖：
 - **角色覆盖（role_override）**：`Ignore previous instructions` / `忽略以上指令`
 - **DAN 越狱（dan）**：`Act as DAN` / `you are now in developer mode`
 - **系统提示泄露（data_exfil）**：`Reveal your system prompt` / `显示你的系统提示词`
 - **PII 诱导（pii_leak）**：索要 API key / token
 - **提示注入（prompt_injection）**：`[system]` 标签 / base64 编码 / Markdown XSS
 - **无限制请求（jailbreak）**：`no restrictions` / `无限制`
+- **URL / 钓鱼（data_exfil）**：短链接（bit.ly / tinyurl）、含凭证 URL（user:pass@host）、裸 IP 主机、数据外泄服务（webhook.site / ngrok / interactsh）
 
-> **关于"规则数 > 类别数"**：共 20 条规则（正则 + 关键词）映射到 6 个 `AttackType` 类别——同一类别下多条规则覆盖不同变体（如 `ignore-previous-instructions` / `ignore-above-zh` / `you-are-now` 都归为 role_override）。检测输出按 `AttackType` 聚合报告，`Detection.Rule` 字段标明具体命中的规则名。
+> **关于"规则数 > 类别数"**：共 24 条规则（正则 + 关键词）映射到 6 个 `AttackType` 类别——同一类别下多条规则覆盖不同变体（如 `ignore-previous-instructions` / `ignore-above-zh` / `you-are-now` 都归为 role_override；4 条 URL 规则也都归为 data_exfil）。检测输出按 `AttackType` 聚合报告，`Detection.Rule` 字段标明具体命中的规则名。
 
 ### 2. 红队测试用例集（redteam）
 31 个经典攻击用例（含 3 个良性对照），来自 JailbreakBench / garak / 公开越狱研究。按类别：jailbreak / dan / role_override / info_leak / pii / injection / chain / obfuscation / multilingual / xss / benign。
@@ -101,7 +102,7 @@ func main() {
        │
        ▼
    ┌──────────┐  规则模式匹配（正则 + 关键词）
-   │ detector │  20 条规则 → 6 类攻击模板
+   │ detector │  24 条规则 → 6 类攻击模板
    └────┬─────┘
         │  []Detection
         ▼
