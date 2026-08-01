@@ -1,0 +1,15 @@
+# flow-pipe 开发配置
+storage:
+  database_path: "flow-pipe.db"
+logging:
+  level: "debug"
+  format: "text"
+server:
+  host: "127.0.0.1"
+  port: 8767
+  read_timeout_seconds: 30
+  write_timeout_seconds: 30
+worker:
+  enabled: false
+  server_url: ""
+  id: ""

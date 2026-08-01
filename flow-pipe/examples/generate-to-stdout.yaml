@@ -1,0 +1,18 @@
+# 示例 1：generate → stdout（无需外部文件，最简验证）
+name: generate-to-stdout
+steps:
+  - id: gen
+    type: source
+    connector: generate
+    config:
+      count: 3
+      fields:
+        id: "seq"
+        name: "alice"
+        amount: 100
+  - id: out
+    type: sink
+    connector: stdout
+    config:
+      format: "json"
+    depends_on: [gen]

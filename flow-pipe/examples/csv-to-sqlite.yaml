@@ -1,0 +1,22 @@
+# 示例 2：csv → filter → sqlite（典型 ETL 闭环）
+# 前置：准备 examples/data/input.csv（含 name,amount 两列）
+name: csv-to-sqlite
+steps:
+  - id: read
+    type: source
+    connector: csv
+    config:
+      path: "examples/data/input.csv"
+  - id: filter
+    type: transform
+    connector: filter
+    config:
+      where: "amount > 50"
+    depends_on: [read]
+  - id: write
+    type: sink
+    connector: sqlite
+    config:
+      path: "examples/data/output.db"
+      table: "records"
+    depends_on: [filter]
