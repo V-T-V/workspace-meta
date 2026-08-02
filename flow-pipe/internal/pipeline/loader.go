@@ -93,8 +93,19 @@ func Parse(raw []byte) (*Pipeline, error) {
 	return &Pipeline{Name: pf.Name, Steps: steps}, nil
 }
 
-// expandEnv 把 ${VAR} 替换为 os.Getenv("VAR") 的值。
-// 未设置的环境变量替换为空字符串。
+// expandEnv 把 ${VAR} 形式的占位符替换为 os.Getenv("VAR") 的值。
+// 在 Parse 解析 YAML 之前对原始字节扫描执行——这样 YAML 结构（含引号、
+// 转义）由后续 yaml.Unmarshal 统一处理，env 展开只做纯文本替换，简单可靠。
+//
+// 规则：
+//   - 遇到 "${" 开始占位符，扫描到下一个 "}"，中间内容作为变量名，
+//     整段 ${NAME} 替换为 os.Getenv(NAME)。
+//   - 找不到闭合 "}" 的 "${" 不替换（保留字面，便于发现拼写错误）。
+//   - 单独的 "$"（不跟 '{'）保持字面不变（如价格 $5）。
+//   - 未设置的变量替换为空字符串（os.Getenv 的默认行为）。
+//
+// 这是 docker-compose / shell 风格的最小环境变量插值，不含 ${VAR:-default}
+// 等高级语法（保持零依赖、纯标准库）。
 func expandEnv(raw []byte) []byte {
 	s := string(raw)
 	var out []byte
