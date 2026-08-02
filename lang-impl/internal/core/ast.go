@@ -5,7 +5,7 @@ package core
 //
 // 节点分两类：
 //   - Expr：表达式（有返回值）：Number/String/Bool/Ident/Binary/Unary/Call
-//   - Stmt：语句（无返回值）：Let/FnDecl/If/While/Return/ExprStmt/Block
+//   - Stmt：语句（无返回值）：Let/FnDecl/If/While/For/Return/ExprStmt/Block
 
 // Node 是所有 AST 节点的基接口。
 type Node interface {
@@ -158,6 +158,23 @@ type WhileStmt struct {
 
 func (WhileStmt) stmtNode()            {}
 func (s WhileStmt) NodeLoc() SourceLoc { return s.Loc }
+
+// ForStmt 是 C 风格 for 循环：for (init; cond; update) { body }
+// 语义等价于：init; while (cond) { body; update; }
+//   - Init 是循环前执行一次的语句（通常是 let i = 0），可为 nil
+//   - Cond 是每轮执行前求值的条件（假则退出），可为 nil 表示恒真
+//   - Update 是每轮 body 后执行的语句（通常是裸赋值 i = i + 1），可为 nil
+//   - Body 是循环体
+type ForStmt struct {
+	Loc    SourceLoc
+	Init   Stmt
+	Cond   Expr
+	Update Stmt
+	Body   *BlockStmt
+}
+
+func (ForStmt) stmtNode()            {}
+func (s ForStmt) NodeLoc() SourceLoc { return s.Loc }
 
 // ReturnStmt 返回：return expr;（expr 可为 nil 表示 return;）
 type ReturnStmt struct {

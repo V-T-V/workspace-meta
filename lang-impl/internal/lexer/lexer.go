@@ -2,7 +2,7 @@
 //
 // 支持的 token：
 //   - 字面量：数字（十进制整数）、字符串（双引号）、true/false
-//   - 标识符与关键字：let / fn / if / else / while / return
+//   - 标识符与关键字：let / fn / if / else / while / for / return
 //   - 运算符：+ - * / % > < >= <= == != && || ! =
 //   - 分隔符：( ) { } , ;
 //   - 注释：// 行注释（跳过）
@@ -23,6 +23,7 @@ var keywords = map[string]core.TokenType{
 	"if":     core.TokIf,
 	"else":   core.TokElse,
 	"while":  core.TokWhile,
+	"for":    core.TokFor,
 	"return": core.TokReturn,
 	"true":   core.TokTrue,
 	"false":  core.TokFalse,

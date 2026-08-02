@@ -3,7 +3,7 @@
 //
 // 解析范围：
 //   - 表达式（含运算符优先级：|| < && < ==/!= < 比较 < +/- < */% < 一元 < 主）
-//   - 语句：let / fn / if-else / while / return / 表达式语句 / 块
+//   - 语句：let / fn / if-else / while / for / return / 表达式语句 / 块
 //   - 程序：顶层语句序列（函数声明 + 全局 let + 表达式语句）
 //
 // 边界：
@@ -130,6 +130,8 @@ func (p *Parser) parseStmt() (core.Stmt, error) {
 		return p.parseIf()
 	case core.TokWhile:
 		return p.parseWhile()
+	case core.TokFor:
+		return p.parseFor()
 	case core.TokReturn:
 		return p.parseReturn()
 	case core.TokLBrace:
@@ -272,6 +274,108 @@ func (p *Parser) parseWhile() (core.Stmt, error) {
 		return nil, err
 	}
 	return &core.WhileStmt{Loc: kw.Loc, Cond: cond, Body: body}, nil
+}
+
+// parseFor: "for" "(" init? ";" cond? ";" update? ")" block
+//
+// C 风格 for 循环。三段都以 ';' 分隔，每段皆可为空：
+//
+//	for (let i = 0; i < 10; i = i + 1) { ... }
+//	for (;;) { ... }   // 无限循环（cond 为空视为真）
+//
+// init/update 是"无尾分号"的语句片段：支持 let（let i = 0）、裸赋值
+// （i = i + 1）或表达式语句。复用 parseSimpleStmtNoSemi 解析，避免与
+// parseStmt 的 ";" 消费冲突（for 子句的 ';' 由本函数显式 expect）。
+func (p *Parser) parseFor() (core.Stmt, error) {
+	kw := p.advance() // for
+	if _, err := p.expect(core.TokLParen); err != nil {
+		return nil, err
+	}
+	// init（可空）
+	var init core.Stmt
+	if !p.check(core.TokSemicolon) {
+		s, err := p.parseSimpleStmtNoSemi()
+		if err != nil {
+			return nil, err
+		}
+		init = s
+	}
+	if _, err := p.expect(core.TokSemicolon); err != nil {
+		return nil, err
+	}
+	// cond（可空 → 恒真）
+	var cond core.Expr
+	if !p.check(core.TokSemicolon) {
+		c, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		cond = c
+	}
+	if _, err := p.expect(core.TokSemicolon); err != nil {
+		return nil, err
+	}
+	// update（可空）
+	var update core.Stmt
+	if !p.check(core.TokRParen) {
+		s, err := p.parseSimpleStmtNoSemi()
+		if err != nil {
+			return nil, err
+		}
+		update = s
+	}
+	if _, err := p.expect(core.TokRParen); err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &core.ForStmt{Loc: kw.Loc, Init: init, Cond: cond, Update: update, Body: body}, nil
+}
+
+// parseSimpleStmtNoSemi 解析"单条语句但不消费尾分号"，用于 for 子句：
+// 支持 let 绑定、裸赋值（ident = expr）或表达式语句。
+// 不消费 ';'——分隔符由调用方（parseFor）显式处理。
+func (p *Parser) parseSimpleStmtNoSemi() (core.Stmt, error) {
+	tok := p.peek()
+	switch tok.Type {
+	case core.TokLet:
+		// 复用 parseLet 的逻辑但不期望尾分号：这里就地实现一份精简版。
+		kw := p.advance() // let
+		nameTok, err := p.expect(core.TokIdent)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.expect(core.TokAssign); err != nil {
+			return nil, err
+		}
+		init, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		return &core.LetStmt{Loc: kw.Loc, Name: nameTok.Value, Init: init}, nil
+	case core.TokIdent:
+		// 裸赋值：ident = expr
+		if p.peekAt(1).Type == core.TokAssign {
+			nameTok := p.advance() // ident
+			loc := nameTok.Loc
+			if _, err := p.expect(core.TokAssign); err != nil {
+				return nil, err
+			}
+			init, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			return &core.LetStmt{Loc: loc, Name: nameTok.Value, Init: init, IsAssign: true}, nil
+		}
+	}
+	// 否则按表达式语句（如函数调用 foo() ）
+	e, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+	return &core.ExprStmt{Loc: tok.Loc, Expr: e}, nil
 }
 
 // parseReturn: "return" expr? ";"
@@ -605,6 +709,26 @@ func printNode(sb *strings.Builder, n any, indent int) {
 	case *core.WhileStmt:
 		sb.WriteString("While\n")
 		printNode(sb, e.Cond, indent+1)
+		writeIndent(sb, indent+1)
+		sb.WriteString("Body:\n")
+		printNode(sb, e.Body, indent+2)
+	case *core.ForStmt:
+		sb.WriteString("For\n")
+		if e.Init != nil {
+			writeIndent(sb, indent+1)
+			sb.WriteString("Init:\n")
+			printNode(sb, e.Init, indent+2)
+		}
+		if e.Cond != nil {
+			writeIndent(sb, indent+1)
+			sb.WriteString("Cond:\n")
+			printNode(sb, e.Cond, indent+2)
+		}
+		if e.Update != nil {
+			writeIndent(sb, indent+1)
+			sb.WriteString("Update:\n")
+			printNode(sb, e.Update, indent+2)
+		}
 		writeIndent(sb, indent+1)
 		sb.WriteString("Body:\n")
 		printNode(sb, e.Body, indent+2)

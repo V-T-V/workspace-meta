@@ -265,6 +265,69 @@ pick(1);`
 	}
 }
 
+// ===== for 循环 =====
+
+func TestForLoopBasic(t *testing.T) {
+	// C 风格 for：累加 0..9 = 45。
+	src := `let total = 0;
+for (let i = 0; i < 10; i = i + 1) { total = total + i; }
+return total;`
+	if got := runInt(t, src); got != 45 {
+		t.Errorf("for 累加 0..9 应为 45，实际 %d", got)
+	}
+}
+
+func TestForLoopScopedVar(t *testing.T) {
+	// for 的 init（let i）不应泄漏到外层：循环结束后 i 不可见。
+	src := `let outer = 0;
+for (let i = 0; i < 3; i = i + 1) { outer = outer + i; }
+return outer;`
+	if got := runInt(t, src); got != 3 {
+		t.Errorf("for 累加 0..2 应为 3，实际 %d", got)
+	}
+}
+
+func TestForLoopReturnInBody(t *testing.T) {
+	// return 应能穿透 for 循环直达函数边界。
+	src := `fn firstHit() {
+  for (let i = 0; i < 100; i = i + 1) {
+    if (i == 7) { return i; }
+  }
+  return -1;
+}
+return firstHit();`
+	if got := runInt(t, src); got != 7 {
+		t.Errorf("for 内 return 应返回 7，实际 %d", got)
+	}
+}
+
+func TestForLoopNested(t *testing.T) {
+	// 嵌套 for：乘法表式累加。
+	src := `let total = 0;
+for (let i = 0; i < 3; i = i + 1) {
+  for (let j = 0; j < 3; j = j + 1) {
+    total = total + 1;
+  }
+}
+return total;`
+	if got := runInt(t, src); got != 9 {
+		t.Errorf("嵌套 for 应累加到 9，实际 %d", got)
+	}
+}
+
+func TestForLoopEmptyCond(t *testing.T) {
+	// 空 cond 视为恒真：只能靠 return 跳出。
+	src := `let n = 0;
+for (let i = 0; ; i = i + 1) {
+  n = n + 1;
+  if (i >= 4) { return n; }
+}
+return -1;`
+	if got := runInt(t, src); got != 5 {
+		t.Errorf("空 cond for 循环应跑 5 轮，实际 %d", got)
+	}
+}
+
 // ===== return =====
 
 func TestReturnInsideIf(t *testing.T) {

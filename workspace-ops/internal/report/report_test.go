@@ -118,3 +118,43 @@ func TestCalculateHealth(t *testing.T) {
 		t.Errorf("中等项目应 90（20+30+20+20=90，无 build artifacts 不加分），实际 %d", score)
 	}
 }
+
+// TestBuildFillsHealthScore 验证 Build 调用 CalculateHealth 填充 HealthScore。
+func TestBuildFillsHealthScore(t *testing.T) {
+	r := Build(sampleFacts())
+	// proj-a: agents(+20) tests(+30) git-clean(+20) go(+20) = 90
+	if r.Projects[0].HealthScore != 90 {
+		t.Errorf("proj-a HealthScore 应为 90，实际 %d", r.Projects[0].HealthScore)
+	}
+	// proj-b: no-agents tests(+30) git-dirty(0) node/ts(+20) = 50
+	if r.Projects[1].HealthScore != 50 {
+		t.Errorf("proj-b HealthScore 应为 50，实际 %d", r.Projects[1].HealthScore)
+	}
+}
+
+// TestHealthScoreInTextReport 验证 health_score 列出现在 text 输出中。
+func TestHealthScoreInTextReport(t *testing.T) {
+	r := Build(sampleFacts())
+	out := TextReporter{}.Format(r)
+	for _, want := range []string{"HEALTH", "90", "50"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("text 输出应含 %q\n实际:\n%s", want, out)
+		}
+	}
+}
+
+// TestHealthScoreInMarkdownReport 验证 health_score 列出现在 markdown 输出中。
+func TestHealthScoreInMarkdownReport(t *testing.T) {
+	r := Build(sampleFacts())
+	out := MarkdownReporter{}.Format(r)
+	if !strings.Contains(out, "| Health |") {
+		t.Errorf("markdown 表头应含 Health 列\n实际:\n%s", out)
+	}
+	// proj-a 行末应是 | 90 |
+	if !strings.Contains(out, "proj-a | go | 12 | ✓ | main | 90 |") {
+		t.Errorf("proj-a 行应含 health=90\n实际:\n%s", out)
+	}
+	if !strings.Contains(out, "proj-b | node/ts | 5 | ✗ | dev* | 50 |") {
+		t.Errorf("proj-b 行应含 health=50\n实际:\n%s", out)
+	}
+}

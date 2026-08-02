@@ -111,3 +111,59 @@ func CSVReport(results []BatchResult) string {
 	}
 	return sb.String()
 }
+
+// MarkdownReport 把批量结果导出为 Markdown 表格格式。
+//
+// 输出结构：
+//
+//	# 批量检测报告
+//
+//	**总计**: N  **安全**: S  **命中**: F
+//
+//	| input | score | level | rules |
+//	|-------|-------|-------|-------|
+//	| ...   | 42    | MEDIUM| ruleA; ruleB |
+//
+// rules 列把每条检测的规则名按 "; " 连接；安全输入该列为空。
+// 单元格内的 "|" 转义为 "\|"，避免破坏表格。
+func MarkdownReport(results []BatchResult) string {
+	var sb strings.Builder
+	total := len(results)
+	safe, flagged := 0, 0
+	for _, r := range results {
+		if len(r.Detections) == 0 {
+			safe++
+		} else {
+			flagged++
+		}
+	}
+
+	// 标题 + 汇总段
+	sb.WriteString("# 批量检测报告\n\n")
+	sb.WriteString(fmt.Sprintf("**总计**: %d  **安全**: %d  **命中**: %d\n\n", total, safe, flagged))
+
+	// 表格
+	sb.WriteString("| input | score | level | rules |\n")
+	sb.WriteString("|-------|-------|-------|-------|\n")
+	for _, r := range results {
+		rules := make([]string, 0, len(r.Detections))
+		for _, d := range r.Detections {
+			rules = append(rules, d.Rule)
+		}
+		input := mdEscapeCell(r.Input)
+		rulesCol := mdEscapeCell(strings.Join(rules, "; "))
+		sb.WriteString(fmt.Sprintf("| %s | %d | %s | %s |\n",
+			input, r.RiskScore, r.RiskLevel, rulesCol))
+	}
+	return sb.String()
+}
+
+// mdEscapeCell 转义 Markdown 表格单元格里的特殊字符：
+// "|" 会破坏表格列结构，换行会破坏行结构，反斜杠需先转义避免吞掉后续字符。
+func mdEscapeCell(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "|", "\\|")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -16,31 +17,32 @@ const (
 )
 
 // Step 是管道定义里的一步（对应 YAML 里的一个 steps[] 条目）。
+// JSON 标签让 ToJSON 输出 snake_case（与 YAML 风格一致）。
 type Step struct {
-	ID        string         // 步骤唯一 ID（如 "read" / "clean" / "write"）
-	Kind      StepKind       // source / transform / sink
-	Connector string         // 连接器类型名（如 "csv" / "filter" / "sqlite"）
-	Config    map[string]any // 连接器配置
-	DependsOn []string       // 前置步骤 ID（定义 DAG 边）
+	ID        string         `json:"id"`                   // 步骤唯一 ID（如 "read" / "clean" / "write"）
+	Kind      StepKind       `json:"kind"`                 // source / transform / sink
+	Connector string         `json:"connector"`            // 连接器类型名（如 "csv" / "filter" / "sqlite"）
+	Config    map[string]any `json:"config,omitempty"`     // 连接器配置
+	DependsOn []string       `json:"depends_on,omitempty"` // 前置步骤 ID（定义 DAG 边）
 
 	// Retry 失败时的重试次数（默认 0=不重试）。仅对临时性错误有用（如网络抖动）。
-	Retry int
+	Retry int `json:"retry,omitempty"`
 	// DeadLetter 失败后的死信处理：若配置了，步骤失败时把输入行写入此 sink 连接器，
 	// 而非让整个管道失败。config 同 sink 的 config。
 	// 形如 {connector: "csv", config: {path: "dead.csv"}}。仅对 transform/sink 有意义。
-	DeadLetter *DeadLetterConfig
+	DeadLetter *DeadLetterConfig `json:"dead_letter,omitempty"`
 }
 
 // DeadLetterConfig 死信处理配置。
 type DeadLetterConfig struct {
-	Connector string         // sink 连接器名（如 "csv" / "sqlite"）
-	Config    map[string]any // sink 配置
+	Connector string         `json:"connector"`        // sink 连接器名（如 "csv" / "sqlite"）
+	Config    map[string]any `json:"config,omitempty"` // sink 配置
 }
 
 // Pipeline 是一个完整的数据管道（一组 Step 组成的 DAG）。
 type Pipeline struct {
-	Name  string
-	Steps []Step
+	Name  string `json:"Name"`
+	Steps []Step `json:"Steps"`
 }
 
 // TopoSort 返回步骤的拓扑序（依赖在前）。
@@ -149,4 +151,36 @@ func (p Pipeline) String() string {
 		parts = append(parts, fmt.Sprintf("  [%s] %s/%s%s", s.Kind, s.ID, s.Connector, deps))
 	}
 	return strings.Join(parts, "\n")
+}
+
+// ToJSON 把管道定义序列化为 JSON（便于 API 传输/存储）。
+// 用 encoding/json 序列化 Pipeline（Name + Steps 数组），输出带缩进的可读 JSON。
+// Steps 各字段的 JSON key 用 snake_case：
+//
+//	{
+//	  "Name": "csv-to-sqlite",
+//	  "Steps": [
+//	    {
+//	      "id": "read",
+//	      "kind": "source",
+//	      "connector": "csv",
+//	      "config": {...},
+//	      "depends_on": ["..."],
+//	      "retry": 0,
+//	      "dead_letter": null
+//	    }
+//	  ]
+//	}
+//
+// 步骤为空时输出 "Steps": []（而非 null），便于消费端稳定处理。
+func (p Pipeline) ToJSON() (string, error) {
+	// 兜底：保证 nil Steps 序列化为空数组而非 null（消费端更友好）。
+	if p.Steps == nil {
+		p.Steps = []Step{}
+	}
+	b, err := json.MarshalIndent(p, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("序列化管道 %q 失败: %w", p.Name, err)
+	}
+	return string(b), nil
 }

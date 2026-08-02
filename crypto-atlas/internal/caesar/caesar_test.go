@@ -84,3 +84,31 @@ func TestCrack(t *testing.T) {
 		t.Error("key=7 应解密出原文")
 	}
 }
+
+// TestFrequencyCrack 用足够长的英文密文验证频率分析能找回正确的 key。
+// 文本取一段自然英文，足够长以让字母频率稳定接近标准分布。
+func TestFrequencyCrack(t *testing.T) {
+	plaintext := "the quick brown fox jumps over the lazy dog and then " +
+		"it runs away into the forest while the dog keeps chasing it " +
+		"through the trees and across the river until the sun goes down"
+	// 用多个 key 加密，验证每个都能被破解回来
+	for _, key := range []int{1, 3, 7, 13, 25} {
+		ciphertext := Encrypt(plaintext, key)
+		got := FrequencyCrack(ciphertext)
+		if got != key {
+			t.Errorf("key=%d: FrequencyCrack 返回 %d，期望 %d（解密: %q）",
+				key, got, key, Decrypt(ciphertext, got))
+		}
+		// 双重确认：用破解出的 key 解密应得回原文
+		if Decrypt(ciphertext, got) != plaintext {
+			t.Errorf("key=%d: 用破解 key=%d 解密未还原原文", key, got)
+		}
+	}
+}
+
+// TestFrequencyCrackNoLetters 无字母的密文不应 panic，返回 0。
+func TestFrequencyCrackNoLetters(t *testing.T) {
+	if got := FrequencyCrack("123 !@# 中"); got != 0 {
+		t.Errorf("无字母应返回 0，实际 %d", got)
+	}
+}

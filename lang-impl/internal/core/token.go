@@ -42,6 +42,7 @@ const (
 	TokIf     // if
 	TokElse   // else
 	TokWhile  // while
+	TokFor    // for
 	TokReturn // return
 
 	// 运算符
@@ -78,7 +79,7 @@ const (
 var tokenNames = map[TokenType]string{
 	TokNumber: "number", TokString: "string", TokTrue: "true", TokFalse: "false",
 	TokIdent: "ident", TokLet: "let", TokFn: "fn", TokIf: "if", TokElse: "else",
-	TokWhile: "while", TokReturn: "return",
+	TokWhile: "while", TokFor: "for", TokReturn: "return",
 	TokPlus: "+", TokMinus: "-", TokStar: "*", TokSlash: "/", TokPercent: "%",
 	TokGT: ">", TokLT: "<", TokGE: ">=", TokLE: "<=", TokEQ: "==", TokNE: "!=",
 	TokAnd: "&&", TokOr: "||", TokNot: "!", TokAssign: "=",

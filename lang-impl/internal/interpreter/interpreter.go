@@ -221,6 +221,42 @@ func (itp *Interpreter) execStmt(stmt core.Stmt, env *Environment) (any, error) 
 			}
 		}
 		return nil, nil
+	case *core.ForStmt:
+		// C 风格 for：init → while(cond) { body; update }
+		// 在循环专属子作用域里执行，使 init 的 let i 不污染外层（块级作用域）。
+		// update 是裸赋值（LetStmt{IsAssign:true}），Set 沿链更新到此循环作用域的 i。
+		loopEnv := NewEnvironment(env)
+		if s.Init != nil {
+			if _, err := itp.execStmt(s.Init, loopEnv); err != nil {
+				return nil, err
+			}
+		}
+		for {
+			// cond 为空视为恒真（无限循环，靠 body 内 return/break 语义跳出；
+			// 当前无 break 语句，故只能靠 return 跳出）。
+			if s.Cond != nil {
+				cond, err := itp.evalExpr(s.Cond, loopEnv)
+				if err != nil {
+					return nil, err
+				}
+				b, err := asBool(cond, s.Cond.NodeLoc())
+				if err != nil {
+					return nil, err
+				}
+				if !b {
+					break
+				}
+			}
+			if _, err := itp.execBlock(s.Body, loopEnv); err != nil {
+				return nil, err
+			}
+			if s.Update != nil {
+				if _, err := itp.execStmt(s.Update, loopEnv); err != nil {
+					return nil, err
+				}
+			}
+		}
+		return nil, nil
 	case *core.ExprStmt:
 		return itp.evalExpr(s.Expr, env)
 	case *core.BlockStmt:

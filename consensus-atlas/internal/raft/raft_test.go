@@ -241,3 +241,165 @@ func TestNetworkPartitionRecovery(t *testing.T) {
 		t.Error("40 轮 tick+drain 后仍有节点未同步到 cmd2")
 	}
 }
+
+// TestSplitBrain 验证脑裂（网络分区导致双 Leader 候选）下的 Raft 安全性：
+//
+//	5 节点集群，先选出 Leader L1（低 term）。
+//	人为分区：L1 + 1 follower（少数派，2 节点 < quorum=3）vs 3 followers（多数派）。
+//	多数派侧收不到 L1 心跳 → 选举超时 → 选出新 Leader L2（更高 term）。
+//
+// 断言：
+//  1. 分区期间，L1（少数派）侧 Propose 无法 commit（matchIndex 凑不齐 quorum）。
+//  2. 分区期间，L2（多数派）侧 Propose 能 commit。
+//  3. 恢复分区后，L2 因 term 更高成为唯一 Leader（L1 降级为 Follower）。
+//
+// 这正是 Raft 的核心安全保证（论文 §5.4.1, §6）：任一 term 内最多一个 Leader
+// 能提交，且已提交的数据不会被"分区恢复"推翻。
+func TestSplitBrain(t *testing.T) {
+	tr := core.NewMemTransport()
+
+	ids := []core.NodeID{"n1", "n2", "n3", "n4", "n5"}
+	// 不同选举超时（5/7/9/11/13 ticks），n1 最先觉醒当 Leader（L1）。
+	timeouts := map[core.NodeID]int{"n1": 5, "n2": 7, "n3": 9, "n4": 11, "n5": 13}
+	nodes := make(map[core.NodeID]*Node, len(ids))
+	for _, id := range ids {
+		n := NewNode(id, ids, timeouts[id], tr)
+		n.Start()
+		nodes[id] = n
+	}
+
+	// tickAll 推进一轮：所有节点 Tick 一次 + transport Drain 一次。
+	tickAll := func() {
+		for _, id := range ids {
+			nodes[id].Tick()
+		}
+		tr.Drain()
+	}
+	// tickPartition 只推进分区活跃侧的节点（被 BlockNode 隔离的不 Tick）。
+	tickPartition := func() {
+		for _, id := range ids {
+			if !tr.IsBlocked(id) {
+				nodes[id].Tick()
+			}
+		}
+		tr.Drain()
+	}
+
+	// 第一阶段：选出初始 Leader L1（应为 n1，超时最小）。
+	for i := 0; i < 30; i++ {
+		tickAll()
+	}
+	var l1 *Node
+	leaderCnt := 0
+	for _, id := range ids {
+		if nodes[id].State == core.StateLeader {
+			l1 = nodes[id]
+			leaderCnt++
+		}
+	}
+	if leaderCnt != 1 || l1 == nil {
+		t.Fatalf("应选出唯一 L1，实际 %d 个 Leader", leaderCnt)
+	}
+	if l1.ID != "n1" {
+		t.Fatalf("L1 应为 n1（最小选举超时），实际 %s", l1.ID)
+	}
+	l1Term := l1.CurrentTerm
+	t.Logf("L1 当选: %s, term=%d", l1.ID, l1Term)
+
+	// 第二阶段：网络分区——把 L1 和一个 follower（n2）隔离成少数派。
+	// BlockNode 让 From/To 含被隔离节点的消息全部丢失，等价于 n1↔{n3,n4,n5}
+	// 和 n2↔{n3,n4,n5} 全断；只剩多数派 {n3,n4,n5} 内部互通。
+	tr.BlockNode("n1")
+	tr.BlockNode("n2")
+	t.Logf("分区：少数派 {n1,n2}（含旧 Leader L1） vs 多数派 {n3,n4,n5}")
+
+	// 第三阶段：多数派侧收不到 L1 心跳 → 选举超时 → 选出新 Leader L2。
+	// n3 的选举超时（9 ticks）最小，故 n3 最先觉醒。给它足够 tick 让选举完成。
+	var l2 *Node
+	for i := 0; i < 40 && l2 == nil; i++ {
+		tickPartition()
+		for _, id := range ids {
+			if id == "n1" || id == "n2" {
+				continue // 少数派侧不算
+			}
+			if nodes[id].State == core.StateLeader {
+				l2 = nodes[id]
+			}
+		}
+	}
+	if l2 == nil {
+		t.Fatalf("多数派侧应选出新 Leader L2")
+	}
+	if l2.CurrentTerm <= l1Term {
+		t.Fatalf("L2 term 应高于 L1（%d），实际 %d", l1Term, l2.CurrentTerm)
+	}
+	t.Logf("L2 当选: %s, term=%d", l2.ID, l2.CurrentTerm)
+
+	// 第四阶段：L1（少数派）侧 Propose 应无法 commit（quorum=3 不够）。
+	// L1 提议后即便多轮 tick，CommitIndex 不应前进。
+	l1CommitBefore := l1.CommitIndex
+	if !l1.Propose("l1-cmd") {
+		t.Fatalf("L1 Propose 应被接受（Leader 身份仍在）")
+	}
+	for i := 0; i < 15; i++ {
+		tickPartition() // L1 侧的 tick 让它继续尝试复制，但消息都被分区丢弃
+	}
+	if l1.CommitIndex != l1CommitBefore {
+		t.Errorf("L1 少数派侧不应能 commit（quorum 不够），CommitIndex %d→%d",
+			l1CommitBefore, l1.CommitIndex)
+	}
+	t.Logf("L1 侧 commit 卡在 %d（少数派无法提交，符合预期）", l1.CommitIndex)
+
+	// 第五阶段：L2（多数派）侧 Propose 应能 commit（quorum=3 达到）。
+	l2CommitBefore := l2.CommitIndex
+	if !l2.Propose("l2-cmd") {
+		t.Fatalf("L2 Propose 应被接受")
+	}
+	for i := 0; i < 15; i++ {
+		tickPartition()
+	}
+	if l2.CommitIndex <= l2CommitBefore {
+		t.Fatalf("L2 多数派侧应能 commit，CommitIndex 未前进（%d）", l2.CommitIndex)
+	}
+	t.Logf("L2 侧 commit 推进到 %d（多数派正常提交）", l2.CommitIndex)
+
+	// 第六阶段：恢复分区。
+	tr.UnblockNode("n1")
+	tr.UnblockNode("n2")
+	t.Logf("分区恢复，让 L2 的高 term 心跳覆盖 L1")
+
+	// 多轮 tick+drain 让 L2 的 AppendEntries 到达 L1，迫使 L1 降级。
+	for i := 0; i < 40; i++ {
+		tickAll()
+	}
+
+	// 第七阶段：最终唯一 Leader 是 L2（term 更高），L1 降为 Follower。
+	finalLeaders := []*Node{}
+	for _, id := range ids {
+		if nodes[id].State == core.StateLeader {
+			finalLeaders = append(finalLeaders, nodes[id])
+		}
+	}
+	if len(finalLeaders) != 1 {
+		var ids []string
+		for _, n := range finalLeaders {
+			ids = append(ids, string(n.ID))
+		}
+		t.Fatalf("恢复后应唯一 Leader，实际 %d 个: %v", len(finalLeaders), ids)
+	}
+	onlyLeader := finalLeaders[0]
+	if onlyLeader.ID != l2.ID {
+		t.Errorf("唯一 Leader 应为 L2(%s)，实际 %s", l2.ID, onlyLeader.ID)
+	}
+	if onlyLeader.CurrentTerm < l2.CurrentTerm {
+		t.Errorf("Leader term 不应低于 L2 的 %d，实际 %d", l2.CurrentTerm, onlyLeader.CurrentTerm)
+	}
+	if l1.State != core.StateFollower {
+		t.Errorf("L1(%s) 应降级为 Follower，实际 %s", l1.ID, l1.State)
+	}
+	if l1.CurrentTerm < onlyLeader.CurrentTerm {
+		t.Errorf("L1 term 应已被拉齐到 %d，实际 %d", onlyLeader.CurrentTerm, l1.CurrentTerm)
+	}
+	t.Logf("最终唯一 Leader: %s term=%d（L1 已降级为 %s）",
+		onlyLeader.ID, onlyLeader.CurrentTerm, l1.State)
+}

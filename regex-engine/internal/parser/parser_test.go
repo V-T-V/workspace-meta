@@ -342,3 +342,123 @@ func containsRune(chars []rune, r rune) bool {
 	}
 	return false
 }
+
+// runesEqual 报告两个 rune 切片元素完全一致（顺序无关时用 runesEqualUnsorted）。
+func runesEqual(a, b []rune) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestParsePosixLower(t *testing.T) {
+	n, err := Parse(`\p{lower}`)
+	if err != nil {
+		t.Fatalf(`\p{lower} 应能解析: %v`, err)
+	}
+	if n.Kind != ast.KindCharClass {
+		t.Fatalf("应为 CharClass，实际 %v", n.Kind)
+	}
+	want := []rune("abcdefghijklmnopqrstuvwxyz")
+	if !runesEqual(n.Chars, want) {
+		t.Errorf(`\p{lower} 应展开为 a-z（26 字符），实际 %v`, n.Chars)
+	}
+}
+
+func TestParsePosixUpper(t *testing.T) {
+	n, err := Parse(`\p{upper}`)
+	if err != nil {
+		t.Fatalf(`\p{upper} 应能解析: %v`, err)
+	}
+	want := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	if !runesEqual(n.Chars, want) {
+		t.Errorf(`\p{upper} 应展开为 A-Z（26 字符），实际 %v`, n.Chars)
+	}
+}
+
+func TestParsePosixDigit(t *testing.T) {
+	n, err := Parse(`\p{digit}`)
+	if err != nil {
+		t.Fatalf(`\p{digit} 应能解析: %v`, err)
+	}
+	want := []rune("0123456789")
+	if !runesEqual(n.Chars, want) {
+		t.Errorf(`\p{digit} 应展开为 0-9（10 字符），实际 %v`, n.Chars)
+	}
+	// \p{digit} 与 \d 展开结果应一致
+	dNode, _ := Parse(`\d`)
+	if !runesEqual(n.Chars, dNode.Chars) {
+		t.Error(`\p{digit} 应与 \d 展开结果一致`)
+	}
+}
+
+func TestParsePosixAlpha(t *testing.T) {
+	n, err := Parse(`\p{alpha}`)
+	if err != nil {
+		t.Fatalf(`\p{alpha} 应能解析: %v`, err)
+	}
+	want := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	if !runesEqual(n.Chars, want) {
+		t.Errorf(`\p{alpha} 应展开为 a-zA-Z（52 字符），实际 %v (len=%d)`, n.Chars, len(n.Chars))
+	}
+}
+
+func TestParsePosixAlnum(t *testing.T) {
+	n, err := Parse(`\p{alnum}`)
+	if err != nil {
+		t.Fatalf(`\p{alnum} 应能解析: %v`, err)
+	}
+	want := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	if !runesEqual(n.Chars, want) {
+		t.Errorf(`\p{alnum} 应展开为 a-zA-Z0-9（62 字符），实际 len=%d`, len(n.Chars))
+	}
+}
+
+func TestParsePosixInsideConcat(t *testing.T) {
+	// \p{lower}+ 应解析成 Plus(CharClass)，可在更复杂正则中组合使用。
+	n, err := Parse(`\p{lower}+`)
+	if err != nil {
+		t.Fatalf(`\p{lower}+ 应能解析: %v`, err)
+	}
+	if n.Kind != ast.KindPlus {
+		t.Fatalf("根应为 Plus，实际 %v", n.Kind)
+	}
+	if len(n.Children) != 1 || n.Children[0].Kind != ast.KindCharClass {
+		t.Errorf("Plus 子节点应为 CharClass")
+	}
+}
+
+func TestParsePosixUnknownError(t *testing.T) {
+	// 不认识的简写名应报错
+	if _, err := Parse(`\p{punct}`); err == nil {
+		t.Error(`\p{punct} 未支持，应报错`)
+	}
+}
+
+func TestParsePosixUnclosedError(t *testing.T) {
+	// 缺少 '}' 应报错
+	if _, err := Parse(`\p{lower`); err == nil {
+		t.Error(`\p{lower 未闭合应报错`)
+	}
+}
+
+func TestParsePosixCaseInsensitive(t *testing.T) {
+	// (?i)\p{lower} 应把 a-z 补成大小写两版本（与 (?i)[a-z] 一致）。
+	n, err := Parse(`(?i)\p{lower}`)
+	if err != nil {
+		t.Fatalf(`(?i)\p{lower} 应能解析: %v`, err)
+	}
+	if n.Kind != ast.KindCharClass {
+		t.Fatalf("应为 CharClass，实际 %v", n.Kind)
+	}
+	for _, want := range []rune{'a', 'A', 'z', 'Z'} {
+		if !containsRune(n.Chars, want) {
+			t.Errorf(`(?i)\p{lower} 应含 %q，实际 %v`, string(want), n.Chars)
+		}
+	}
+}

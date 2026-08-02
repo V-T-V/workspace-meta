@@ -49,6 +49,8 @@ type Report struct {
 }
 
 // Build 从 Facts 列表构建 Report。
+// 每个项目的 HealthScore 在这里由 CalculateHealth 计算并填充
+// （FromFacts 只做 facts 扁平化，不算分；HealthScore 留给本函数统一填）。
 func Build(facts []inspector.Facts) Report {
 	r := Report{
 		Projects:     make([]ProjectView, 0, len(facts)),
@@ -56,6 +58,11 @@ func Build(facts []inspector.Facts) Report {
 	}
 	for _, f := range facts {
 		v := FromFacts(f)
+		// 推断 has_build_artifacts：facts 里若显式给出就采纳，供 CalculateHealth 加分。
+		if f.Get("has_build_artifacts") == "true" {
+			v.HasBuildArtifacts = true
+		}
+		v.HealthScore = CalculateHealth(v)
 		r.Projects = append(r.Projects, v)
 		r.ProjectCount++
 		stack := v.StackPrimary
@@ -125,8 +132,8 @@ func (TextReporter) Format(r Report) string {
 	fmt.Fprintf(&b, "工作区扫描报告（%d 个项目）\n", r.ProjectCount)
 	fmt.Fprintf(&b, "技术栈分布: %s\n\n", formatStackSummary(r.StackSummary))
 	// 表头
-	fmt.Fprintln(&b, pad("SLUG", 28), pad("STACK", 12), pad("TESTS", 6), pad("AGENTS", 7), pad("GIT", 20))
-	fmt.Fprintln(&b, strings.Repeat("-", 75))
+	fmt.Fprintln(&b, pad("SLUG", 28), pad("STACK", 12), pad("TESTS", 6), pad("AGENTS", 7), pad("GIT", 20), pad("HEALTH", 6))
+	fmt.Fprintln(&b, strings.Repeat("-", 85))
 	for _, p := range r.Projects {
 		git := p.GitBranch
 		if p.GitDirty {
@@ -141,6 +148,7 @@ func (TextReporter) Format(r Report) string {
 			pad(or(p.TestCount, "0"), 6),
 			pad(boolMark(p.HasAgentsMD), 7),
 			pad(git, 20),
+			pad(fmt.Sprintf("%d", p.HealthScore), 6),
 		)
 	}
 	return b.String()
@@ -170,16 +178,16 @@ func (MarkdownReporter) Format(r Report) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# 工作区扫描报告（%d 个项目）\n\n", r.ProjectCount)
 	fmt.Fprintf(&b, "**技术栈分布**: %s\n\n", formatStackSummary(r.StackSummary))
-	fmt.Fprintln(&b, "| Slug | Stack | Tests | AGENTS.md | Git |")
-	fmt.Fprintln(&b, "|------|-------|-------|-----------|-----|")
+	fmt.Fprintln(&b, "| Slug | Stack | Tests | AGENTS.md | Git | Health |")
+	fmt.Fprintln(&b, "|------|-------|-------|-----------|-----|--------|")
 	for _, p := range r.Projects {
 		git := p.GitBranch
 		if p.GitDirty {
 			git += "*"
 		}
-		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
+		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %d |\n",
 			p.Slug, or(p.StackPrimary, "-"), or(p.TestCount, "0"),
-			boolMark(p.HasAgentsMD), or(git, "-"))
+			boolMark(p.HasAgentsMD), or(git, "-"), p.HealthScore)
 	}
 	return b.String()
 }

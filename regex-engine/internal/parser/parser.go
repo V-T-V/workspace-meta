@@ -258,6 +258,8 @@ func (p *Parser) parseEscape() (*ast.Node, error) {
 	}
 	esc := p.advance()
 	switch esc {
+	case 'p': // \p{name} POSIX 风格字符类简写
+		return p.parsePosixClass()
 	case 'd': // [0-9]
 		return ast.NewCharClass([]rune("0123456789"), false), nil
 	case 'w': // [a-zA-Z0-9_]
@@ -279,6 +281,55 @@ func (p *Parser) parseEscape() (*ast.Node, error) {
 		// 转义普通字符：\. \* \+ 等，按字面量处理
 		return p.newLiteral(esc), nil
 	}
+}
+
+// parsePosixClass 解析 \p{name} 形式的预定义字符类简写。
+// 进入时位置已消费了 "\p"，期望当前字符是 '{'。
+// 支持的 name（仿 POSIX/常见 regex 引擎风格，子集）：
+//
+//	\p{lower} → [a-z]
+//	\p{upper} → [A-Z]
+//	\p{digit} → [0-9]（等价 \d）
+//	\p{alpha} → [a-zA-Z]
+//	\p{alnum} → [a-zA-Z0-9]
+//
+// 不识别的 name 报错（避免静默产生空字符类造成困惑）。
+func (p *Parser) parsePosixClass() (*ast.Node, error) {
+	if !p.match('{') {
+		return nil, fmt.Errorf("位置 %d: 期望 \\p{ 后跟 '{'", p.pos)
+	}
+	// 收集 name 到 '}'
+	var name []rune
+	for {
+		c := p.peek()
+		if c == -1 {
+			return nil, fmt.Errorf("位置 %d: \\p{...} 未闭合（缺少 '}'）", p.pos)
+		}
+		if c == '}' {
+			p.advance()
+			break
+		}
+		name = append(name, p.advance())
+	}
+	nameStr := string(name)
+	// (?i) 下扩展字符集（补大小写对侧），与普通字符类处理一致。
+	var chars []rune
+	switch nameStr {
+	case "lower": // [a-z]
+		chars = []rune("abcdefghijklmnopqrstuvwxyz")
+	case "upper": // [A-Z]
+		chars = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	case "digit": // [0-9]，等价 \d
+		chars = []rune("0123456789")
+	case "alpha": // [a-zA-Z]
+		chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	case "alnum": // [a-zA-Z0-9]
+		chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	default:
+		return nil, fmt.Errorf("位置 %d: 未知的字符类简写 \\p{%s}", p.pos, nameStr)
+	}
+	chars = p.expandCharClassForCI(chars)
+	return ast.NewCharClass(chars, false), nil
 }
 
 // parseCharClass: [...] 字符类，支持 a-z 范围、^ 取反、\d \w \s 转义
