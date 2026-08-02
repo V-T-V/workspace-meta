@@ -72,3 +72,41 @@ web-standards-research/
 go-rmm/
 go-agent-research/
 rust-agent-research/
+
+# K 组：基础设施与工程工具（各自独立 go.mod，不入根仓库）
+consensus-atlas/
+workspace-ops/
+flow-pipe/
+lang-impl/
+crypto-atlas/
+regex-engine/
+ai-safety-atlas/
+obs-lite/
+
+# K 组总结文档（临时）
+K_GROUP_SUMMARY.md
+
+# 大二进制文件（模型/压缩包/DLL/数据库，绝不入库）
+*.gguf
+*.bin
+*.tar.gz
+*.tar
+*.7z
+*.rar
+*.dll
+*.so
+*.dylib
+*.db
+*.db-wal
+*.db-shm
+*.wasm
+*.exe
+
+# 构建/缓存目录
+bin/
+dist/
+.next/
+coverage/
+__pycache__/
+.pytest_cache/
+node_modules/
