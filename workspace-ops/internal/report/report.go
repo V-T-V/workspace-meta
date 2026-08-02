@@ -394,6 +394,36 @@ func formatStackSummary(m map[string]int) string {
 	return strings.Join(parts, " ")
 }
 
+// Search 在报告中按关键字搜索项目（匹配 slug/stack）。
+//
+// 匹配规则：把 query 转小写后，在项目的 Slug、StackPrimary、StackAll 三个字段中
+// 做子串匹配（大小写不敏感）。任一字段命中即纳入结果。
+//
+// 设计取舍：
+//   - 只搜 slug/stack（不搜 facts）：facts 是开放键值集合，语义不可控，
+//     贸然全字段搜会引入大量噪音；slug/stack 是项目最稳定的定位维度。
+//   - 子串匹配 + 大小写不敏感：覆盖最常见的 "按语言查"（go）、
+//     "按名字片段查"（auth）场景，零依赖、无需分词。
+//   - 空 query 返回 nil：避免"空查询命中全部"造成意外（调用方若需全量可直接用 r.Projects）。
+//   - 保持命中项在 r.Projects 里的原始顺序（确定性，便于断言）。
+//
+// 返回匹配到的 ProjectView 切片；无匹配返回 nil。
+func Search(r Report, query string) []ProjectView {
+	q := strings.ToLower(query)
+	if q == "" {
+		return nil
+	}
+	var out []ProjectView
+	for _, p := range r.Projects {
+		if strings.Contains(strings.ToLower(p.Slug), q) ||
+			strings.Contains(strings.ToLower(p.StackPrimary), q) ||
+			strings.Contains(strings.ToLower(p.StackAll), q) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // CalculateHealth 计算项目健康评分（0-100）。
 // - has AGENTS.md: +20
 // - has tests (test_count > 0): +30

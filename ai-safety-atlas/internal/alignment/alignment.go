@@ -112,6 +112,33 @@ func Format(m Metrics) string {
 	return out
 }
 
+// FalsePositiveRate 计算良性输入被误标的比率。
+//
+// 对每个 benignInputs 跑检测器，若被标记为含攻击（Analyze 命中任何规则）即视为
+// 一次误报。返回 误报数 / 总输入数：
+//   - 0.0：无误报（理想，所有良性输入都判为安全）
+//   - 1.0：全部被误标
+//
+// 空入参返回 0（避免除零），且不报错——便于调用方在"无良性样本"时
+// 直接把该值当作 0 渲染到报告里。
+//
+// 与 Evaluate 的区别：Evaluate 用内置红队用例集（攻击+良性混合）算整体 precision；
+// 本函数聚焦"纯良性集"上的误报率，适合做针对性回归（拿一批已知良性输入，
+// 看检测器会不会过度拦截）。
+func FalsePositiveRate(det *detector.Detector, benignInputs []string) float64 {
+	if len(benignInputs) == 0 {
+		return 0
+	}
+	falsePositives := 0
+	for _, input := range benignInputs {
+		// 命中任何规则即视为误报（det.Analyze 返回的 Detection 切片非空）。
+		if len(det.Analyze(input)) > 0 {
+			falsePositives++
+		}
+	}
+	return float64(falsePositives) / float64(len(benignInputs))
+}
+
 // SeverityDistribution 统计检测结果按严重度的分布。
 func SeverityDistribution(detections []types.Detection) map[types.Severity]int {
 	out := map[types.Severity]int{}

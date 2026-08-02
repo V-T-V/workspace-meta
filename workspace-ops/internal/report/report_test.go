@@ -455,3 +455,107 @@ func TestSortStrings(t *testing.T) {
 		}
 	}
 }
+
+// ===== Search =====
+
+// TestSearchBySlug 验证按 slug 子串搜索（"go-" 匹配 go-1/go-2/go-3）。
+func TestSearchBySlug(t *testing.T) {
+	r := Build(groupedFacts())
+	got := Search(r, "go-")
+	if len(got) != 3 {
+		t.Fatalf("slug 含 'go-' 应匹配 3 个，实际 %d", len(got))
+	}
+	for _, p := range got {
+		if !strings.HasPrefix(p.Slug, "go-") {
+			t.Errorf("结果应只含 go-* 项目，发现 %q", p.Slug)
+		}
+	}
+}
+
+// TestSearchByStack 验证按 stack 搜索（"rust" 匹配 rust-1）。
+func TestSearchByStack(t *testing.T) {
+	r := Build(groupedFacts())
+	got := Search(r, "rust")
+	if len(got) != 1 {
+		t.Fatalf("stack 'rust' 应匹配 1 个，实际 %d", len(got))
+	}
+	if got[0].Slug != "rust-1" {
+		t.Errorf("应匹配 rust-1，实际 %s", got[0].Slug)
+	}
+}
+
+// TestSearchStackMatchesAllStacks 验证 "go" 同时命中 StackPrimary 和 StackAll。
+// groupedFacts 里 go 项目的 stack_all 也设为 "go"，故应命中 3 个 go 项目。
+func TestSearchStackMatchesAllStacks(t *testing.T) {
+	r := Build(groupedFacts())
+	got := Search(r, "go")
+	if len(got) != 3 {
+		t.Errorf("搜 'go' 应命中 3 个 go 项目，实际 %d", len(got))
+	}
+}
+
+// TestSearchCaseInsensitive 验证大小写不敏感（"GO" 应匹配 go 栈项目）。
+func TestSearchCaseInsensitive(t *testing.T) {
+	r := Build(groupedFacts())
+	lower := Search(r, "go")
+	upper := Search(r, "GO")
+	mixed := Search(r, "Go")
+	if len(lower) != len(upper) || len(lower) != len(mixed) {
+		t.Errorf("大小写不敏感应返回相同数量：go=%d GO=%d Go=%d",
+			len(lower), len(upper), len(mixed))
+	}
+}
+
+// TestSearchEmptyQuery 验证空 query 返回 nil（不命中全部）。
+func TestSearchEmptyQuery(t *testing.T) {
+	r := Build(groupedFacts())
+	if got := Search(r, ""); got != nil {
+		t.Errorf("空 query 应返回 nil，实际 %d 个", len(got))
+	}
+}
+
+// TestSearchNoMatch 验证无匹配返回 nil。
+func TestSearchNoMatch(t *testing.T) {
+	r := Build(groupedFacts())
+	if got := Search(r, "zzz-no-such-thing"); got != nil {
+		t.Errorf("无匹配应返回 nil，实际 %d 个", len(got))
+	}
+}
+
+// TestSearchPreservesOrder 验证结果保持原 Projects 顺序。
+func TestSearchPreservesOrder(t *testing.T) {
+	r := Build(groupedFacts())
+	got := Search(r, "go-")
+	want := []string{"go-1", "go-2", "go-3"}
+	if len(got) != len(want) {
+		t.Fatalf("应有 %d 个，实际 %d", len(want), len(got))
+	}
+	for i, w := range want {
+		if got[i].Slug != w {
+			t.Errorf("位置 %d 应为 %s，实际 %s（全量：%v）", i, w, got[i].Slug, got)
+		}
+	}
+}
+
+// TestSearchSlugSubstring 验证 slug 子串匹配（"node" 匹配 node-1）。
+func TestSearchSlugSubstring(t *testing.T) {
+	r := Build(groupedFacts())
+	got := Search(r, "node")
+	if len(got) != 1 || got[0].Slug != "node-1" {
+		t.Errorf("搜 'node' 应匹配 node-1，实际 %v", got)
+	}
+}
+
+// TestSearchReturnsCopies 验证修改返回切片不影响原 Report（值语义）。
+func TestSearchReturnsCopies(t *testing.T) {
+	r := Build(groupedFacts())
+	got := Search(r, "go-")
+	if len(got) == 0 {
+		t.Fatal("应有匹配")
+	}
+	got[0].Slug = "MUTATED"
+	// 原 Report 的 Projects 不应被改。
+	if r.Projects[0].Slug == "MUTATED" {
+		t.Error("Search 返回的应是值拷贝，修改结果不应影响原 Report")
+	}
+}

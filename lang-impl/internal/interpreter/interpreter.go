@@ -541,6 +541,31 @@ func (itp *Interpreter) evalCall(e *core.CallExpr, env *Environment) (any, error
 		}
 		return string(runes[si:ei]), nil
 	}
+	// 内置函数 join(arr, sep)：把数组元素用分隔符拼成字符串。
+	// 元素按 valueToString 转字符串（支持 int/bool/string 等），与 + 拼接语义一致。
+	if e.Callee == "join" && len(e.Args) == 2 {
+		arr, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		sep, err := itp.evalExpr(e.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		a, ok := arr.([]any)
+		if !ok {
+			return nil, core.NewError(e.Loc, "join() 第一个参数必须是数组，实际 %s", typeName(arr))
+		}
+		sepStr, ok := sep.(string)
+		if !ok {
+			return nil, core.NewError(e.Loc, "join() 第二个参数必须是字符串，实际 %s", typeName(sep))
+		}
+		parts := make([]string, len(a))
+		for i, v := range a {
+			parts[i] = valueToString(v)
+		}
+		return strings.Join(parts, sepStr), nil
+	}
 	// 内置函数 charAt(str, index)：返回指定位置的单字符字符串
 	if e.Callee == "charAt" && len(e.Args) == 2 {
 		s, err := itp.evalExpr(e.Args[0], env)

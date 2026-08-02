@@ -661,6 +661,52 @@ func TestPush(t *testing.T) {
 	}
 }
 
+func TestJoin(t *testing.T) {
+	// 字符串数组用空格拼接
+	if got := runString(t, `return join(["hello", "world"], " ");`); got != "hello world" {
+		t.Errorf(`join(["hello","world"]," ") 应 "hello world"，实际 %q`, got)
+	}
+	// 逗号分隔
+	if got := runString(t, `return join(["a", "b", "c"], ",");`); got != "a,b,c" {
+		t.Errorf(`join(["a","b","c"],",") 应 "a,b,c"，实际 %q`, got)
+	}
+	// 空分隔符 → 直接拼接
+	if got := runString(t, `return join(["ab", "cd"], "");`); got != "abcd" {
+		t.Errorf(`join(["ab","cd"],"") 应 "abcd"，实际 %q`, got)
+	}
+	// 数组元素是 int：按 valueToString 转字符串
+	if got := runString(t, `return join([1, 2, 3], "-");`); got != "1-2-3" {
+		t.Errorf(`join([1,2,3],"-") 应 "1-2-3"，实际 %q`, got)
+	}
+	// 混合类型元素
+	if got := runString(t, `return join([1, true, "x"], "|");`); got != "1|true|x" {
+		t.Errorf(`join([1,true,"x"],"|") 应 "1|true|x"，实际 %q`, got)
+	}
+	// 空数组 → 空字符串
+	if got := runString(t, `return join([], ",");`); got != "" {
+		t.Errorf(`join([],",") 应 ""，实际 %q`, got)
+	}
+	// 单元素数组
+	if got := runString(t, `return join(["solo"], ",");`); got != "solo" {
+		t.Errorf(`join(["solo"],",") 应 "solo"，实际 %q`, got)
+	}
+}
+
+func TestJoinErrors(t *testing.T) {
+	// 第一个参数非数组应报错
+	if _, err := run(t, `return join("abc", ",");`); err == nil {
+		t.Error(`join("abc",",") 第一个参数非数组应报错`)
+	}
+	// 第二个参数非字符串应报错
+	if _, err := run(t, `return join([1, 2], 3);`); err == nil {
+		t.Error(`join([1,2],3) 第二个参数非字符串应报错`)
+	}
+	// 参数数量不对：join 内置只在恰好 2 参时匹配，其余会落到"未定义函数"分支报错
+	if _, err := run(t, `return join([1, 2]);`); err == nil {
+		t.Error(`join([1,2]) 参数不足应报错`)
+	}
+}
+
 func TestCharArrayMixed(t *testing.T) {
 	// 数组 + 字符串操作组合
 	src := `let parts = ["he", "llo"];

@@ -13,6 +13,7 @@
 //	crypto-atlas -d dh          # Diffie-Hellman 密钥交换
 //	crypto-atlas -d otp         # 一次性密码本（信息论绝对安全）
 //	crypto-atlas -d tlssim      # TLS 1.2 简化握手模拟
+//	crypto-atlas -d password    # 密码强度检查器
 //	crypto-atlas -d all         # 依次运行全部 demo
 //	crypto-atlas -version
 package main
@@ -32,6 +33,7 @@ import (
 	"github.com/QiuShichang/crypto-atlas/internal/hmac"
 	"github.com/QiuShichang/crypto-atlas/internal/md5"
 	"github.com/QiuShichang/crypto-atlas/internal/otp"
+	"github.com/QiuShichang/crypto-atlas/internal/password"
 	"github.com/QiuShichang/crypto-atlas/internal/rsa"
 	"github.com/QiuShichang/crypto-atlas/internal/sha256"
 	"github.com/QiuShichang/crypto-atlas/internal/tlssim"
@@ -46,7 +48,7 @@ func main() {
 		demo    string
 		showVer bool
 	)
-	flag.StringVar(&demo, "d", "caesar", "demo: caesar|vigenere|xor|aes|des|sha256|md5|rsa|dh|otp|tlssim|all")
+	flag.StringVar(&demo, "d", "caesar", "demo: caesar|vigenere|xor|aes|des|sha256|md5|rsa|dh|otp|tlssim|password|all")
 	flag.BoolVar(&showVer, "version", false, "打印版本号")
 	flag.Parse()
 
@@ -66,7 +68,7 @@ func main() {
 
 func run(ctx context.Context, demo string) error {
 	if demo == "all" {
-		all := []string{"caesar", "vigenere", "xor", "aes", "des", "sha256", "md5", "rsa", "dh", "otp", "hmac", "tlssim"}
+		all := []string{"caesar", "vigenere", "xor", "aes", "des", "sha256", "md5", "rsa", "dh", "otp", "hmac", "tlssim", "password"}
 		for _, d := range all {
 			fmt.Printf("\n========== ▶ %s ==========\n", d)
 			if err := run(ctx, d); err != nil {
@@ -112,7 +114,10 @@ func run(ctx context.Context, demo string) error {
 	case "tlssim":
 		_, err := tlssim.Demo(ctx)
 		return err
+	case "password":
+		_, err := password.Demo(ctx)
+		return err
 	default:
-		return fmt.Errorf("未知 demo: %s（可选: caesar|vigenere|xor|aes|des|sha256|md5|rsa|dh|otp|tlssim|all）", demo)
+		return fmt.Errorf("未知 demo: %s（可选: caesar|vigenere|xor|aes|des|sha256|md5|rsa|dh|otp|tlssim|password|all）", demo)
 	}
 }

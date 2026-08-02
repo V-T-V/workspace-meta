@@ -11,6 +11,8 @@
 package matcher
 
 import (
+	"strings"
+
 	"github.com/QiuShichang/regex-engine/internal/nfa"
 	"github.com/QiuShichang/regex-engine/internal/parser"
 )
@@ -583,4 +585,53 @@ func MustMatchString(pattern, text string) bool {
 		panic(err)
 	}
 	return m.Match(text)
+}
+
+// metaChars 是本引擎识别的正则元字符。Quote 会在它们前面加反斜杠转义。
+// 与 Go 标准库 regexp.QuoteMeta 的字符集保持一致。
+const metaChars = `\.+*?()|[]{}^$`
+
+// isMetaByte 报告 b 是否为正则元字符。
+// 用查表替代线性扫描，让 Quote 在长字符串上保持 O(n)。
+var isMetaByte [128]bool
+
+func init() {
+	for _, c := range metaChars {
+		isMetaByte[c] = true
+	}
+}
+
+// Quote 返回一个匹配字面量字符串 s 的正则表达式。
+// 把所有正则元字符转义：. * + ? ( ) [ ] { } | \ ^ $
+//
+// 典型用途：把用户输入（如搜索关键字、文件名片段）安全地嵌入正则，
+// 避免其中的元字符改变匹配语义。
+//
+//	Quote("1+1=2")  → `1\+1=2`
+//	Quote("(a)b")   → `\(a\)b`
+//	Quote(`a\b`)    → `a\\b`
+//
+// 非 ASCII（rune >= 128）字符不可能是 ASCII 元字符，原样透传。
+func Quote(s string) string {
+	// 预扫描：若没有任何元字符，直接返回原串，避免无谓分配。
+	var needed int
+	for i := 0; i < len(s); i++ {
+		if s[i] < 128 && isMetaByte[s[i]] {
+			needed++
+		}
+	}
+	if needed == 0 {
+		return s
+	}
+	// 每个元字符前插一个 '\'，结果长度 = len(s) + needed
+	var b strings.Builder
+	b.Grow(len(s) + needed)
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c < 128 && isMetaByte[c] {
+			b.WriteByte('\\')
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }
