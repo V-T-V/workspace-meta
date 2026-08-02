@@ -260,7 +260,18 @@ func (s *Service) AnswerStream(ctx context.Context, req ChatRequest) (<-chan Eve
 		return events, nil
 	}
 
-	// 1c. 超短问题（<4 字符）无法提取有效 FTS 关键词，标记跳过 RAG
+	// 1c. 输入预检：脏话/无关话题/注入/闲聊
+	guard := CheckInput(req.Question)
+	if guard.Action == GuardShortcut {
+		go s.runGuardReply(ctx, req, traceID, guard.Reply, "guard_shortcut", events)
+		return events, nil
+	}
+	if guard.Action == GuardReject {
+		go s.runGuardReply(ctx, req, traceID, guard.Reply, "guard_reject:"+guard.Reason, events)
+		return events, nil
+	}
+
+	// 1d. 超短问题（<4 字符）无法提取有效 FTS 关键词，标记跳过 RAG
 	isShortChitchat := len([]rune(strings.TrimSpace(maskedQuestion))) < 4
 
 	// 2. FAQ 匹配短路：高置信命中时直接返回标准答案，不调用模型（<500ms）
@@ -557,4 +568,29 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return string(runes[:n]) + "…"
+}
+
+// runGuardReply Guard 层预设回复（闲聊/拒绝），不调模型。
+func (s *Service) runGuardReply(ctx context.Context, req ChatRequest, traceID, reply, intent string, events chan<- Event) {
+	defer close(events)
+	start := time.Now()
+	if !sendEvent(ctx, events, Event{Type: "status", Payload: "处理中", Extra: traceID}) {
+		return
+	}
+	msgID := uuid.NewString()
+	resp := ChatResponse{
+		MessageID:  msgID,
+		Answer:     reply,
+		Intent:     intent,
+		TraceID:    traceID,
+		DurationMS: time.Since(start).Milliseconds(),
+	}
+	if err := storage.AppendMessage(ctx, s.db, &storage.Message{
+		ID: msgID, ConversationID: req.ConversationID,
+		Role: "assistant", Content: reply, Intent: intent,
+	}); err != nil {
+		s.log.Error("[chat] Guard 回答落库失败", "traceId", traceID, "err", err)
+	}
+	s.log.Info("[chat] Guard 拦截", "traceId", traceID, "intent", intent, "dur", resp.DurationMS)
+	sendEvent(ctx, events, Event{Type: "complete", Extra: resp})
 }

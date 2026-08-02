@@ -72,6 +72,24 @@ class MetricsRegistry:
         with self._lock:
             self._audio_buffer_bytes = n
 
+    def snapshot(self) -> dict:
+        """★ M-3：线程安全地返回延迟样本拷贝（供 dashboard/管理台曲线图用）。
+
+        在锁内 list() 拷贝 deque，避免迭代时被写侧 append 导致 RuntimeError。
+        """
+        with self._lock:
+            return {
+                "first_token_ms": list(self._first_token_ms),
+                "first_audio_ms": list(self._first_audio_ms),
+                "first_frame_ms": list(self._first_frame_ms),
+                "pipeline_total": self._pipeline_total,
+                "pipeline_cancel_total": self._pipeline_cancel_total,
+                "tts_fail_total": self._tts_fail_total,
+                "barge_in_total": self._barge_in_total,
+                "sessions_active": self._sessions_active,
+                "uptime_seconds": int(time.time() - self._start_time),
+            }
+
     @staticmethod
     def _percentile(samples: list, p: float) -> float:
         if not samples:

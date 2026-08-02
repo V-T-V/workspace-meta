@@ -207,19 +207,19 @@ class Session:
         if not to_summarize:
             return
 
-        # 调 LLM 压缩（非流式收集完整摘要）
-        summary_text = await self._summarize_messages(to_summarize)
+        # 收集旧摘要（压缩时并入新摘要，避免摘要无限累积导致上下文反向膨胀）
+        old_summaries = [m.content for m in self.history
+                         if m.role == "system" and "对话摘要" in m.content]
+        # 调 LLM 压缩（旧摘要 + 旧对话 → 一条新摘要，合并而非追加）
+        summary_text = await self._summarize_messages(to_summarize, old_summaries)
 
-        # 重建 history：system(若有) + 旧摘要(若有) + 新摘要 + 近期原文
+        # 重建 history：system 人设(若有) + 新摘要（唯一，合并了旧的） + 近期原文
         new_history: list[Message] = []
-        # 保留首个 system 消息（人设）
-        if self.history and self.history[0].role == "system":
+        # 保留首个 system 消息（人设）——但跳过摘要消息（摘要已并入新摘要）
+        if (self.history and self.history[0].role == "system"
+                and "对话摘要" not in self.history[0].content):
             new_history.append(self.history[0])
-        # 保留已有的摘要消息（累积长期记忆）
-        for m in self.history:
-            if m.role == "system" and "对话摘要" in m.content:
-                new_history.append(m)
-        # 新摘要
+        # 新摘要（★ M-6：不再保留旧摘要，它们已并入新摘要，防累积膨胀）
         if summary_text:
             new_history.append(Message(
                 role="system",
@@ -230,8 +230,8 @@ class Session:
 
         old_len = len(self.history)
         self.history = new_history
-        log.info("记忆压缩 session=%s: %d 条 → %d 条（压缩 %d 条旧消息为摘要）",
-                 self.session_id, old_len, len(new_history), len(to_summarize))
+        log.info("记忆压缩 session=%s: %d 条 → %d 条（压缩 %d 条旧消息 + %d 条旧摘要 → 1 条新摘要）",
+                 self.session_id, old_len, len(new_history), len(to_summarize), len(old_summaries))
 
         # ★ 摘要持久化：把新摘要存进 SQLite，重启后 load_history 能恢复长期记忆
         # （否则压缩只在内存，重启后摘要丢失 = 压缩白做）
@@ -252,14 +252,24 @@ class Session:
         kept.extend(self.history[-self.max_history_messages:])
         self.history = kept
 
-    async def _summarize_messages(self, messages: list[Message]) -> str:
-        """调 LLM 把消息列表压成摘要文本。失败返回空串（不影响对话）。"""
+    async def _summarize_messages(self, messages: list[Message],
+                                  old_summaries: list[str] | None = None) -> str:
+        """调 LLM 把消息列表（+ 旧摘要）压成一条新摘要。失败返回空串（不影响对话）。
+
+        ★ M-6：old_summaries 并入 prompt，让新摘要包含旧摘要的关键信息，
+          避免多次压缩产生多条摘要导致上下文反向膨胀。
+        """
         mem = self.cfg.memory
-        # 拼接要压缩的对话文本
+        parts = []
+        # 旧摘要（之前的长期记忆）并入，让 LLM 合并进新摘要
+        if old_summaries:
+            parts.append("--- 已有摘要（请合并进新摘要）---\n" + "\n".join(old_summaries))
+        # 要压缩的对话文本
         dialog_text = "\n".join(
             f"{'用户' if m.role == 'user' else '助手'}: {m.content}" for m in messages
         )
-        prompt = f"{mem.summary_prompt}\n\n--- 对话历史 ---\n{dialog_text}\n--- 结束 ---"
+        parts.append(f"--- 对话历史 ---\n{dialog_text}\n--- 结束 ---")
+        prompt = f"{mem.summary_prompt}\n\n" + "\n\n".join(parts)
 
         try:
             tokens = []

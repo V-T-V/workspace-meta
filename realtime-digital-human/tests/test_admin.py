@@ -148,15 +148,14 @@ def test_update_config_accepts_new_api_key(tmp_path):
 
 def test_list_sessions(tmp_path):
     """会话列表端点。"""
-    app, cfg, _ = _make_app(tmp_path)
-    # _make_app 不传 store，需直接测 store 逻辑
     from digitalhuman.store import SQLiteStore
     store = SQLiteStore(str(tmp_path / "test.db"))
     import asyncio
-    asyncio.get_event_loop().run_until_complete(
-        store.append_message("sess-a", "user", "你好"))
-    asyncio.get_event_loop().run_until_complete(
-        store.append_message("sess-a", "assistant", "你好呀"))
+
+    async def _seed():
+        await store.append_message("sess-a", "user", "你好")
+        await store.append_message("sess-a", "assistant", "你好呀")
+    asyncio.run(_seed())
 
     from digitalhuman.admin import _list_sessions_sync
     rows = _list_sessions_sync(store)
@@ -170,14 +169,35 @@ def test_get_session_memory(tmp_path):
     from digitalhuman.store import SQLiteStore
     store = SQLiteStore(str(tmp_path / "test.db"))
     import asyncio
-    loop = asyncio.new_event_loop()
-    loop.run_until_complete(store.append_message("s1", "user", "我叫张三"))
-    loop.run_until_complete(store.append_message("s1", "assistant", "你好张三"))
-    loop.run_until_complete(store.append_message("s1", "system", "[对话摘要] 用户叫张三"))
-    loop.close()
+
+    async def _seed():
+        await store.append_message("s1", "user", "我叫张三")
+        await store.append_message("s1", "assistant", "你好张三")
+        await store.append_message("s1", "system", "[对话摘要] 用户叫张三")
+    asyncio.run(_seed())
 
     history = store.get_session_history("s1")
     assert len(history) == 3
     summaries = [m for m in history if m["role"] == "system" and "对话摘要" in m["content"]]
     assert len(summaries) == 1
     assert "张三" in summaries[0]["content"]
+
+
+def test_metrics_endpoint(tmp_path):
+    """延迟监控端点返回三阶段样本 + p50/p95。"""
+    app, cfg, _ = _make_app(tmp_path)
+    client = TestClient(app)
+
+    # 先往 metrics 灌点样本
+    from digitalhuman.metrics import get_metrics
+    m = get_metrics()
+    m.record_pipeline_complete({"first_token_ms": 500, "first_audio_ms": 800, "first_frame_ms": 1200})
+    m.record_pipeline_complete({"first_token_ms": 600, "first_audio_ms": 900, "first_frame_ms": 1400})
+
+    r = client.get("/api/admin/metrics")
+    data = r.json()
+    assert "first_token_ms" in data
+    assert len(data["first_token_ms"]) == 2
+    assert data["first_token_ms_count"] == 2
+    assert data["first_frame_ms_p50"] > 0
+    assert data["first_frame_ms_p95"] >= data["first_frame_ms_p50"]

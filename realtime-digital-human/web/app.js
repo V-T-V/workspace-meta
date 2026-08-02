@@ -7,6 +7,9 @@
 //   P1-4 指数退避：最多 10 次，封顶 30s
 //   P2-9 说话指示：数字人回复时显示 speaking-indicator
 
+// ★ C-1：鉴权部署时 REST fetch 也要透传 token（与 WS 一致），否则仪表盘全 401
+const QS = location.search || "";
+
 const WS_MSG_FRAME = 0x01;
 const WS_MSG_AUDIO = 0x02;
 const WS_MSG_TEXT = 0x03;
@@ -68,6 +71,14 @@ function setStatus(text, cls) {
   statusEl.textContent = text;
   statusEl.className = "status " + (cls || "");
 }
+
+// ★ 阶段状态（正在听/思考/说话/空闲）——让用户感知数字人当前在做什么
+const STAGE_TEXT = {idle: "就绪", listening: "🎙️ 聆听中", thinking: "💭 思考中", speaking: "🗣️ 说话中"};
+function setStage(stage) {
+  // 不覆盖断连/错误状态
+  if (!wsConnected) return;
+  setStatus(STAGE_TEXT[stage] || "就绪", stage === "idle" ? "connected" : stage);
+}
 function showError(msg) {
   setStatus("⚠ " + msg, "disconnected");
   setTimeout(() => {
@@ -80,7 +91,7 @@ function showError(msg) {
 async function loadPersonas() {
   if (!personaSelect) return;  // DOM 未就绪
   try {
-    const r = await fetch("/personas");
+    const r = await fetch("/personas" + QS);
     const data = await r.json();
     if (data.personas && data.personas.length > 0) {
       personaSelect.innerHTML = "";
@@ -109,7 +120,7 @@ if (personaSelect) {
 async function loadHistory() {
   try {
     const sid = getSessionId();
-    const r = await fetch(`/sessions/${sid}/history`);
+    const r = await fetch(`/sessions/${sid}/history${QS}`);
     const data = await r.json();
     if (data.history && data.history.length > 0) {
       // 显示最近几轮的历史（只展示最后 6 条避免太长）
@@ -201,15 +212,18 @@ function handleMessage(type, payload) {
       break;
     case WS_MSG_AUDIO:
       showSpeaking(true);  // P2-9：数字人开始说话
+      setStage("speaking");  // ★ 阶段状态：说话中
       enqueueAudio(payload);
       break;
     case WS_MSG_TEXT: {
       const text = new TextDecoder().decode(payload);
       if (text.startsWith("[user]")) {
         subUser.textContent = text.slice(6).trim();
+        setStage("thinking");  // ★ 识别到用户输入 → 思考中
       } else if (text.startsWith("[assistant]")) {
         subAssistant.textContent += text.slice(11).trim();
         scrollSubtitleToBottom();  // P3-12
+        setStage("speaking");  // ★ 开始回复 → 说话中
       } else if (text.startsWith("[error:fatal]")) {
         showError("❌ " + text.slice(13).trim());  // m7：致命错误醒目提示
       } else if (text.startsWith("[error:warn]")) {
@@ -222,6 +236,7 @@ function handleMessage(type, payload) {
     case WS_MSG_END:
       indicator.style.display = "none";
       showSpeaking(false);  // P2-9：说完
+      setStage("idle");  // ★ 回到空闲
       break;
     case WS_MSG_INTERRUPT:
       // #1 Barge-in：用户开口打断，立即停止音频播放 + 清队列
@@ -415,6 +430,7 @@ async function startRecording() {
   micBtn.textContent = "🔴 录音中…";
   micBtn.disabled = true;
   stopBtn.disabled = false;
+  setStage("listening");  // ★ 录音开始 → 聆听中
   indicator.style.display = "block";
   subAssistant.textContent = "";
 }
@@ -457,7 +473,7 @@ stopBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); stopRecordi
 // ---------- 仪表盘数据拉取 ----------
 async function refreshDashboard() {
   try {
-    const r = await fetch("/api/dashboard");
+    const r = await fetch("/api/dashboard" + QS);
     const d = await r.json();
     const fmt = (ms) => ms > 0 ? (ms / 1000).toFixed(2) + "s" : "-";
     const el = (id) => document.getElementById(id);
@@ -487,6 +503,7 @@ function sendTextInput() {
   if (!text) return;
   sendBytes(0x15, new TextEncoder().encode(text));  // WS_MSG_TEXT_INPUT
   textInput.value = "";
+  setStage("thinking");  // ★ 文字发送 → 思考中
 }
 
 if (sendTextBtn) {

@@ -130,8 +130,11 @@ def register_routes(
         if store is None:
             return {"error": "persist disabled", "history": []}
         try:
-            return {"session_id": session_id,
-                    "history": store.get_session_history(session_id)}
+            # ★ H-2：同步 sqlite 查询放 executor，避免大历史/磁盘抖动卡住事件循环
+            import asyncio as _aio
+            loop = _aio.get_running_loop()
+            history = await loop.run_in_executor(None, store.get_session_history, session_id)
+            return {"session_id": session_id, "history": history}
         except Exception as e:
             return {"error": str(e), "history": []}
 

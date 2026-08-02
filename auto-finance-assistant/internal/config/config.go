@@ -158,8 +158,8 @@ func (c *Config) Validate() error {
 	if c.Ollama.ChatModel == "" {
 		return fmt.Errorf("[config] ollama.chat_model 不能为空")
 	}
-	if c.Generation.MaxOutputTokens < 1 {
-		return fmt.Errorf("[config] generation.max_output_tokens 必须 > 0")
+	if c.Generation.MaxOutputTokens < 0 {
+		return fmt.Errorf("[config] generation.max_output_tokens 不能为负")
 	}
 	if c.Queue.GenerationConcurrency < 1 {
 		return fmt.Errorf("[config] queue.generation_concurrency 必须 >= 1（单 GPU/CPU 推荐 1）")

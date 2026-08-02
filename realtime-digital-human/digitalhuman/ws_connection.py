@@ -312,7 +312,9 @@ class WSConnection:
         self.sess.history.clear()
         if self.store is not None:
             try:
-                self.store.clear_session(self.session_id)
+                # ★ H-3：同步 sqlite DELETE 放 executor，避免阻塞事件循环
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, self.store.clear_session, self.session_id)
             except Exception as e:
                 log.warning("清空持久化历史失败: %s", e)
         log.info("对话已清空 session=%s", self.session_id)

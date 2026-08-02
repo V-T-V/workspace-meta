@@ -72,6 +72,30 @@
     <div class="meta" id="dashboard-meta">会话: - | 运行: -</div>
   </div>
 
+  <!-- ★ 延迟监控（1.5s 生死线可观测）-->
+  <div class="panel">
+    <h2>⏱️ 延迟监控（目标: 首帧 &lt; 1.5s）</h2>
+    <div class="grid2" style="margin-bottom:12px">
+      <div>
+        <div class="meta">首 Token（LLM 响应速度）</div>
+        <div style="font-size:1.6rem;color:#a78bfa;font-weight:bold" id="lat-token-p50">- / -</div>
+        <div class="meta">P50 / P95（ms）</div>
+      </div>
+      <div>
+        <div class="meta">首帧（数字人开口）</div>
+        <div style="font-size:1.6rem;color:#fb923c;font-weight:bold" id="lat-frame-p50">- / -</div>
+        <div class="meta">P50 / P95（ms）· 样本 <span id="lat-count">0</span></div>
+      </div>
+    </div>
+    <canvas id="latency-chart" width="1100" height="180" style="width:100%;background:#0f172a;border-radius:6px;border:1px solid #334155"></canvas>
+    <div class="meta" style="margin-top:6px">
+      <span style="color:#a78bfa">━ 首 Token</span>　
+      <span style="color:#34d399">━ 首音频</span>　
+      <span style="color:#fb923c">━ 首帧</span>　
+      <span style="color:#ef4444">┄ 1.5s 目标线</span>
+    </div>
+  </div>
+
   <!-- 配置 + 测试 -->
   <div class="grid2">
     <div class="panel">

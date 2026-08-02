@@ -35,9 +35,8 @@ def _sanitize_config(cfg: Config) -> dict:
         if section in data and key in data[section]:
             val = data[section][key]
             # 优先看环境变量是否设了 key（运行时实际用的是 env）
-            import os as _os
             env_key_name = f"DH_{section.upper()}_API_KEY"
-            env_val = _os.environ.get(env_key_name, "")
+            env_val = os.environ.get(env_key_name, "")
             actual = env_val or val
             if actual:
                 # 显示尾 4 位（sk-...abcd），用户能确认是哪个 key
@@ -273,7 +272,8 @@ def register_admin_routes(
         _SENSITIVE_VALUES = {"api_key"}
         section_map = {"server": cfg.server, "asr": cfg.asr, "llm": cfg.llm,
                        "tts": cfg.tts, "lipsync": cfg.lipsync, "pusher": cfg.pusher,
-                       "sentence_splitter": cfg.sentence_splitter, "queue": cfg.queue}
+                       "sentence_splitter": cfg.sentence_splitter, "queue": cfg.queue,
+                       "memory": cfg.memory}  # M-5：补 memory 段（否则管理台改不了记忆配置）
         for section, sub_cfg in section_map.items():
             if section not in body:
                 continue
@@ -328,7 +328,7 @@ def register_admin_routes(
         if store is None:
             return {"sessions": [], "msg": "持久化未启用"}
         try:
-            loop = __import__("asyncio").get_event_loop()
+            loop = asyncio.get_running_loop()
             rows = await loop.run_in_executor(None, _list_sessions_sync, store)
             return {"sessions": rows}
         except Exception as e:
@@ -343,7 +343,7 @@ def register_admin_routes(
         if store is None:
             return {"history": [], "summaries": [], "msg": "持久化未启用"}
         try:
-            loop = __import__("asyncio").get_event_loop()
+            loop = asyncio.get_running_loop()
             history = await loop.run_in_executor(
                 None, store.get_session_history, session_id, limit)
             # 从历史里提取摘要消息（长期记忆）
@@ -362,7 +362,7 @@ def register_admin_routes(
         if store is None:
             return {"msg": "持久化未启用，无需清理"}
         try:
-            loop = __import__("asyncio").get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, store.clear_session, session_id)
             log.info("管理台清空会话: %s", session_id)
             return {"msg": f"会话 {session_id} 已清空"}
@@ -418,6 +418,25 @@ def register_admin_routes(
         passed = sum(1 for c in checks if c["ok"])
         return {"total": len(checks), "passed": passed, "checks": checks}
 
+    # ---------- 延迟监控（★ 创新：1.5s 生死线可观测）----------
+
+    @app.get("/api/admin/metrics")
+    async def metrics_history():
+        """返回延迟样本序列（供管理台画曲线图）。
+
+        含 first_token/first_audio/first_frame 三阶段的完整样本序列 + 统计。
+        """
+        from .metrics import get_metrics
+        m = get_metrics()
+        snap = m.snapshot()
+        # 计算各阶段 p50/p95
+        for key in ("first_token_ms", "first_audio_ms", "first_frame_ms"):
+            samples = snap[key]
+            snap[key + "_p50"] = m._percentile(samples, 50)
+            snap[key + "_p95"] = m._percentile(samples, 95)
+            snap[key + "_count"] = len(samples)
+        return snap
+
     # ---------- 重启 ----------
 
     @app.post("/api/admin/restart")
@@ -425,13 +444,21 @@ def register_admin_routes(
         """优雅重启：让当前进程退出，配合外部 supervisor/Start.bat 重启。
 
         ★ 单机部署靠 Start.bat（有 pause）或 nssm 等进程守护重启。
+        ★ H-5：先 flush 日志 + 关闭 uvicorn server，让 lifespan shutdown 事件触发
+          （关闭引擎 session/subprocess），避免 os._exit 跳过清理导致 MuseTalk 孤儿进程。
         """
+        import signal
         log.warning("管理台触发重启，进程即将退出（等待外部重启）...")
 
         async def _delayed_exit():
             await asyncio.sleep(1.0)  # 让响应先返回
-            # 先触发 lifespan 清理（fastapi 的 shutdown 事件）
-            os._exit(0)
+            # flush 日志（RotatingFileHandler buffer），避免丢最后几条
+            for h in logging.getLogger().handlers:
+                try: h.flush()
+                except Exception: pass
+            # 发 SIGTERM 让 uvicorn 走正常 shutdown 流程（触发 lifespan 清理引擎）
+            # 比 os._exit 温和——uvicorn 会关闭 WS、引擎 close()、subprocess kill
+            os.kill(os.getpid(), signal.SIGTERM)
 
         asyncio.create_task(_delayed_exit())
         return {"msg": "正在重启，5 秒后刷新页面"}

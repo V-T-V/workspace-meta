@@ -82,13 +82,13 @@ async def split_token_stream(
         try:
             # 若 buffer 有内容且空闲超时，先切（不等下个 token）
             if buf and last_token_time is not None:
-                idle_ms = (asyncio.get_event_loop().time() - last_token_time) * 1000
+                idle_ms = (asyncio.get_running_loop().time() - last_token_time) * 1000
                 timeout_left = max(0.001, (max_idle_ms - idle_ms) / 1000)
             else:
                 timeout_left = None  # buffer 空时不切，无限等首个 token
             token = await asyncio.wait_for(token_stream.__anext__(), timeout=timeout_left)
             buf += token
-            last_token_time = asyncio.get_event_loop().time()
+            last_token_time = asyncio.get_running_loop().time()
         except asyncio.TimeoutError:
             # 空闲超时，buffer 有内容则切（P2 核心）
             if buf.strip():
@@ -107,7 +107,7 @@ async def split_token_stream(
             buf = buf[n:]
             if sentence.strip():
                 yield sentence
-            last_token_time = asyncio.get_event_loop().time()
+            last_token_time = asyncio.get_running_loop().time()
     # 流结束，flush 剩余
     if buf.strip():
         yield buf

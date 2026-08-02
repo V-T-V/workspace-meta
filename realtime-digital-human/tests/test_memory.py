@@ -112,8 +112,8 @@ async def test_summarize_failure_falls_back_safely():
 
 
 @pytest.mark.asyncio
-async def test_summary_accumulates_with_previous():
-    """多次压缩累积：已有摘要 + 新摘要共存（长期记忆累积）。"""
+async def test_summary_merges_old_into_new():
+    """★ M-6：多次压缩时旧摘要合并进新摘要（只保留一条，防累积膨胀）。"""
     cfg = Config()
     cfg.memory = MemoryConfig(enabled=True, summary_threshold=4, keep_recent_pairs=1)
     # 已有一条旧摘要 + 6 条新对话（> 阈值 4）
@@ -124,7 +124,7 @@ async def test_summary_accumulates_with_previous():
 
     await s._maybe_compress_history()
 
-    # 旧摘要 + 新摘要都在
+    # 只应有 1 条摘要（旧的合并进新的，而非累积 2 条）
     summaries = [m for m in s.history if "对话摘要" in m.content]
-    assert len(summaries) >= 2  # 旧的 + 新的
-    assert any("李四" in m.content for m in summaries)  # 旧摘要保留
+    assert len(summaries) == 1, f"应只有 1 条合并后的摘要，实际 {len(summaries)}"
+    # 新摘要应包含 MockLLM 的固定内容（证明旧摘要信息被 LLM 处理过）

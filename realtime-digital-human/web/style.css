@@ -39,6 +39,10 @@ header h1 { font-size: 1.4rem; font-weight: 600; }
 }
 .status.connected { background: #1b5e20; }
 .status.disconnected { background: #b71c1c; }
+/* ★ 阶段状态颜色 */
+.status.listening { background: #0e7490; }   /* 聆听中-青 */
+.status.thinking { background: #6d28d9; }     /* 思考中-紫 */
+.status.speaking { background: #c2410c; }     /* 说话中-橙 */
 
 main {
   flex: 1;

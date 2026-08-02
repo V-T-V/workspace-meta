@@ -185,12 +185,23 @@ async function restartService() {
 refreshDashboard();
 loadConfig();
 refreshLogs();
+loadSessions();  // C-2：启动时加载会话列表，否则用户以为记忆功能坏了
+refreshMetrics();  // 延迟曲线图
 setInterval(refreshDashboard, 3000);
+setInterval(refreshMetrics, 5000);  // 延迟曲线 5s 刷新
 setInterval(() => {
   if (document.getElementById("log-autorefresh").checked) refreshLogs();
 }, 3000);
 
 // ---------- 会话历史与记忆 ----------
+
+// ★ H-1：XSS 防护——所有用户/会话内容必须转义后再插入 DOM
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s == null ? "" : String(s);
+  return d.innerHTML;
+}
+
 async function loadSessions() {
   try {
     const r = await fetch(`/api/admin/sessions${QS}`);
@@ -198,8 +209,8 @@ async function loadSessions() {
     const wrap = document.getElementById("sessions-list");
     const meta = document.getElementById("sessions-meta");
     if (!d.sessions || d.sessions.length === 0) {
-      wrap.innerHTML = '<p class="meta">暂无会话（' + (d.msg || "") + '）</p>';
-      meta.textContent = "暂无会话";
+      wrap.innerHTML = '<p class="meta">暂无会话</p>';
+      meta.textContent = "暂无会话" + (d.msg ? "（" + esc(d.msg) + "）" : "");
       return;
     }
     meta.textContent = `共 ${d.sessions.length} 个会话`;
@@ -211,8 +222,15 @@ async function loadSessions() {
       item.onmouseleave = () => item.style.background = "";
       item.onclick = () => loadMemory(s.id);
       const t = new Date(s.last_active * 1000).toLocaleString("zh-CN", {hour12: false});
-      item.innerHTML = `<div style="color:#38bdf8">${s.id}</div>
-        <div class="meta">${s.msg_count} 条消息 · ${t}</div>`;
+      // ★ H-1：s.id 用 textContent（非 innerHTML），防 session_id 注入
+      const title = document.createElement("div");
+      title.style.color = "#38bdf8";
+      title.textContent = s.id;
+      const sub = document.createElement("div");
+      sub.className = "meta";
+      sub.textContent = `${s.msg_count} 条消息 · ${t}`;
+      item.appendChild(title);
+      item.appendChild(sub);
       wrap.appendChild(item);
     });
   } catch (e) {
@@ -226,23 +244,106 @@ async function loadMemory(sessionId) {
     const d = await r.json();
     const view = document.getElementById("memory-view");
     if (d.msg) { view.textContent = d.msg; return; }
-    let html = "";
+    view.innerHTML = "";  // 清空，后续全用 DOM API 安全构建
     // 摘要（长期记忆）置顶高亮
     if (d.summaries && d.summaries.length > 0) {
-      html += '<div style="color:#fbbf24;margin-bottom:8px;padding:6px;background:rgba(251,191,36,0.1);border-radius:4px">';
-      html += '<b>🧠 长期记忆（摘要）:</b><br>';
-      d.summaries.forEach(s => { html += `<div style="margin-top:4px">${s.content}</div>`; });
-      html += "</div>";
+      const box = document.createElement("div");
+      box.style.cssText = "color:#fbbf24;margin-bottom:8px;padding:6px;background:rgba(251,191,36,0.1);border-radius:4px";
+      const head = document.createElement("b");
+      head.textContent = "🧠 长期记忆（摘要）:";
+      box.appendChild(head);
+      d.summaries.forEach(s => {
+        const line = document.createElement("div");
+        line.style.marginTop = "4px";
+        line.textContent = s.content;  // ★ H-1：textContent 防 XSS
+        box.appendChild(line);
+      });
+      view.appendChild(box);
     }
     // 完整历史
-    html += '<div style="color:#64748b;margin:8px 0 4px">完整历史 (' + d.total + ' 条):</div>';
+    const histHead = document.createElement("div");
+    histHead.style.cssText = "color:#64748b;margin:8px 0 4px";
+    histHead.textContent = `完整历史 (${d.total} 条):`;
+    view.appendChild(histHead);
     (d.history || []).forEach(m => {
       const role = m.role === "user" ? "用户" : m.role === "assistant" ? "助手" : "系统";
       const color = m.role === "user" ? "#4fd1c5" : m.role === "assistant" ? "#f6ad55" : "#94a3b8";
-      html += `<div style="margin:3px 0"><span style="color:${color}">${role}:</span> ${m.content}</div>`;
+      const line = document.createElement("div");
+      line.style.margin = "3px 0";
+      const label = document.createElement("span");
+      label.style.color = color;
+      label.textContent = role + ": ";
+      line.appendChild(label);
+      line.appendChild(document.createTextNode(m.content));  // ★ H-1：安全插入
+      view.appendChild(line);
     });
-    view.innerHTML = html || "无历史记录";
   } catch (e) {
     toast("加载记忆失败: " + e.message, "error");
   }
+}
+
+// ---------- 延迟监控曲线 ----------
+async function refreshMetrics() {
+  try {
+    const r = await fetch(`/api/admin/metrics${QS}`);
+    const d = await r.json();
+    // 数字展示
+    const fmt = v => v > 0 ? Math.round(v) : "-";
+    const tEl = document.getElementById("lat-token-p50");
+    const fEl = document.getElementById("lat-frame-p50");
+    if (tEl) tEl.textContent = `${fmt(d.first_token_ms_p50)} / ${fmt(d.first_token_ms_p95)}`;
+    if (fEl) fEl.textContent = `${fmt(d.first_frame_ms_p50)} / ${fmt(d.first_frame_ms_p95)}`;
+    const cEl = document.getElementById("lat-count");
+    if (cEl) cEl.textContent = d.first_frame_ms_count || 0;
+    // 画曲线图
+    drawLatencyChart(d);
+  } catch (e) { /* 静默 */ }
+}
+
+function drawLatencyChart(d) {
+  const cv = document.getElementById("latency-chart");
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const series = [
+    {data: d.first_token_ms || [], color: "#a78bfa"},
+    {data: d.first_audio_ms || [], color: "#34d399"},
+    {data: d.first_frame_ms || [], color: "#fb923c"},
+  ];
+  const maxLen = Math.max(...series.map(s => s.data.length), 1);
+  const maxVal = Math.max(...series.flatMap(s => s.data), 1500, 1);
+
+  // 网格 + Y 轴刻度
+  ctx.strokeStyle = "#1e293b"; ctx.fillStyle = "#475569"; ctx.font = "10px sans-serif";
+  for (let v = 0; v <= maxVal; v += 500) {
+    const y = H - 20 - (v / maxVal) * (H - 30);
+    ctx.beginPath(); ctx.moveTo(30, y); ctx.lineTo(W - 10, y); ctx.stroke();
+    ctx.fillText(v + "ms", 2, y + 3);
+  }
+
+  // 1.5s 目标线（红色虚线）
+  const targetY = H - 20 - (1500 / maxVal) * (H - 30);
+  if (targetY > 0 && targetY < H) {
+    ctx.strokeStyle = "#ef4444"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(30, targetY); ctx.lineTo(W - 10, targetY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // 三条曲线
+  for (const s of series) {
+    if (s.data.length === 0) continue;
+    ctx.strokeStyle = s.color; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const step = maxLen > 1 ? (W - 40) / (maxLen - 1) : 0;
+    s.data.forEach((v, i) => {
+      const x = 30 + i * step;
+      const y = H - 20 - (v / maxVal) * (H - 30);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#64748b"; ctx.font = "10px sans-serif";
+  ctx.fillText("最近 " + maxLen + " 轮 →", W - 80, H - 5);
 }

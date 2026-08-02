@@ -77,7 +77,7 @@ class SQLiteStore:
         """追加一条消息（异步，加锁防并发写）。"""
         async with self._lock:
             # sqlite3 是同步，用 run_in_executor 避免阻塞事件循环
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self._append_sync,
                                        session_id, role, content)
 
@@ -103,7 +103,7 @@ class SQLiteStore:
     async def append_messages(self, session_id: str, messages: list[Message]) -> None:
         """批量追加（一次写多轮对话）。"""
         async with self._lock:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self._append_batch_sync,
                                        session_id, messages)
 
