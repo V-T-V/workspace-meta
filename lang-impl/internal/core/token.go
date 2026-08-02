@@ -37,13 +37,15 @@ const (
 
 	// 标识符与关键字
 	TokIdent
-	TokLet    // let
-	TokFn     // fn
-	TokIf     // if
-	TokElse   // else
-	TokWhile  // while
-	TokFor    // for
-	TokReturn // return
+	TokLet      // let
+	TokFn       // fn
+	TokIf       // if
+	TokElse     // else
+	TokWhile    // while
+	TokFor      // for
+	TokReturn   // return
+	TokBreak    // break
+	TokContinue // continue
 
 	// 运算符
 	TokPlus    // +
@@ -80,6 +82,7 @@ var tokenNames = map[TokenType]string{
 	TokNumber: "number", TokString: "string", TokTrue: "true", TokFalse: "false",
 	TokIdent: "ident", TokLet: "let", TokFn: "fn", TokIf: "if", TokElse: "else",
 	TokWhile: "while", TokFor: "for", TokReturn: "return",
+	TokBreak: "break", TokContinue: "continue",
 	TokPlus: "+", TokMinus: "-", TokStar: "*", TokSlash: "/", TokPercent: "%",
 	TokGT: ">", TokLT: "<", TokGE: ">=", TokLE: "<=", TokEQ: "==", TokNE: "!=",
 	TokAnd: "&&", TokOr: "||", TokNot: "!", TokAssign: "=",

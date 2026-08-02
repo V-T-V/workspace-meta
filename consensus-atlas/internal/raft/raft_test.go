@@ -403,3 +403,166 @@ func TestSplitBrain(t *testing.T) {
 	t.Logf("最终唯一 Leader: %s term=%d（L1 已降级为 %s）",
 		onlyLeader.ID, onlyLeader.CurrentTerm, l1.State)
 }
+
+// TestMemberChange 验证"新节点动态加入集群后能通过 AppendEntries 追上 Leader 日志"。
+//
+// 这是成员变更的最简形态（不涉及 Raft joint consensus / C_old-new 两阶段协议）：
+//   - 5 节点集群正常选出 Leader 并提交若干命令
+//   - 动态构造第 6 个节点 n6：注册到 transport（Install）、加入 Leader 的 Peers、
+//     初始化 Leader 对 n6 的 nextIndex=1（让 Leader 从头补发完整日志）
+//   - 继续推进 tick + drain，Leader 的心跳/AppendEntries 把已有日志同步给 n6
+//   - 断言 n6 最终日志与 Leader 完全一致，且 CommitIndex 也被拉齐
+//
+// 注：这里只改 Leader 视角的成员视图，老节点（n2-n5）的 Peers 仍是 5 节点，
+// 但它们只对 Leader 的 AppendEntries 做被动响应，不影响 n6 的追赶；
+// n6 设极大选举超时，保证它在追上之前不会自行发起选举干扰。
+func TestMemberChange(t *testing.T) {
+	tr := core.NewMemTransport()
+
+	ids := []core.NodeID{"n1", "n2", "n3", "n4", "n5"}
+	// 不同选举超时（5/7/9/11/13 ticks），n1 最先觉醒当 Leader。
+	timeouts := map[core.NodeID]int{"n1": 5, "n2": 7, "n3": 9, "n4": 11, "n5": 13}
+	nodes := make(map[core.NodeID]*Node, len(ids))
+	for _, id := range ids {
+		n := NewNode(id, ids, timeouts[id], tr)
+		n.Start()
+		nodes[id] = n
+	}
+
+	// tickAll 推进一轮：所有节点 Tick 一次 + transport Drain 一次。
+	tickAll := func() {
+		for _, id := range ids {
+			nodes[id].Tick()
+		}
+		tr.Drain()
+	}
+
+	// 第一阶段：选出 Leader。
+	for i := 0; i < 30; i++ {
+		tickAll()
+	}
+	var leader *Node
+	leaderCnt := 0
+	for _, id := range ids {
+		if nodes[id].State == core.StateLeader {
+			leader = nodes[id]
+			leaderCnt++
+		}
+	}
+	if leaderCnt != 1 || leader == nil {
+		t.Fatalf("应选出唯一 Leader，实际 %d 个", leaderCnt)
+	}
+	t.Logf("Leader 当选: %s, term=%d", leader.ID, leader.CurrentTerm)
+
+	// 第二阶段：Leader 提交 cmd1、cmd2，并让全集群复制、commit。
+	if !leader.Propose("cmd1") {
+		t.Fatalf("Propose cmd1 失败")
+	}
+	for i := 0; i < 10; i++ {
+		tickAll()
+	}
+	if !leader.Propose("cmd2") {
+		t.Fatalf("Propose cmd2 失败")
+	}
+	for i := 0; i < 10; i++ {
+		tickAll()
+	}
+	if leader.CommitIndex != 2 {
+		t.Fatalf("Leader CommitIndex 应为 2，实际 %d", leader.CommitIndex)
+	}
+	// 记下 Leader 日志快照，供最后逐条比对。
+	leaderSnapshot := append([]core.LogEntry(nil), leader.Log.Entries...)
+	t.Logf("加入 n6 前 Leader 日志长度=%d, CommitIndex=%d", len(leaderSnapshot), leader.CommitIndex)
+
+	// 第三阶段：构造第 6 个节点 n6 并加入集群。
+	//   - NewNode 时 Peers 给全 6 节点（反映真实成员视图）
+	//   - 极大选举超时，避免 n6 在追上前自行发起选举
+	//   - Install 到 transport，使其能收发消息
+	//   - 把 n6 加进 Leader 的 Peers，并初始化 nextIndex=1（从头补发完整日志）
+	const newID core.NodeID = "n6"
+	n6 := NewNode(newID, append(append([]core.NodeID{}, ids...), newID), 10_000, tr)
+	n6.Start()
+	nodes[newID] = n6
+
+	leader.Peers = append(leader.Peers, newID)
+	leader.nextIndex[newID] = 1  // 让 Leader 从头补发（n6 当前日志为空）
+	leader.matchIndex[newID] = 0 // 尚未确认任何条目
+	t.Logf("n6 已加入集群（Leader.Peers=%v，nextIndex[n6]=1）", leader.Peers)
+
+	// tickAll6 推进所有 6 个节点。
+	allIDs := append(append([]core.NodeID{}, ids...), newID)
+	tickAll6 := func() {
+		for _, id := range allIDs {
+			nodes[id].Tick()
+		}
+		tr.Drain()
+	}
+
+	// 第四阶段：Leader 广播 AppendEntries（含完整日志）给 n6，n6 追加并回 MatchIndex。
+	// 给足轮次让补发 + 回复往返完成。
+	//
+	// 注意网络时序：n6 在收到 AppendEntries 当轮就追加日志（LastIndex 立即对齐），
+	// 但它回复的 AppendEntriesResponse 要到"下一轮 Drain"才送回 Leader——
+	// 所以 Leader.matchIndex[n6] 比 n6 自身日志晚一轮推进。
+	// 同步条件必须等 Leader 也确认（matchIndex 拉齐），否则会误判过早结束。
+	synced := false
+	for i := 0; i < 40 && !synced; i++ {
+		tickAll6()
+		// 同时满足：n6 日志对齐 + Leader 已收到 n6 的确认（matchIndex 拉齐）。
+		if n6.Log.LastIndex() == leader.Log.LastIndex() &&
+			leader.matchIndex[newID] == leader.Log.LastIndex() {
+			synced = true
+		}
+	}
+
+	// 第五阶段：断言 n6 日志与 Leader 完全一致（长度 + 每条 Term/Command）。
+	if n6.Log.LastIndex() != leader.Log.LastIndex() {
+		t.Fatalf("n6 未追上：LastIndex n6=%d Leader=%d", n6.Log.LastIndex(), leader.Log.LastIndex())
+	}
+	if len(n6.Log.Entries) != len(leader.Log.Entries) {
+		t.Fatalf("n6 日志长度 %d != Leader %d", len(n6.Log.Entries), len(leader.Log.Entries))
+	}
+	for i := range n6.Log.Entries {
+		got := n6.Log.Entries[i]
+		want := leader.Log.Entries[i]
+		if got.Term != want.Term || got.Command != want.Command || got.Index != want.Index {
+			t.Errorf("n6 日志 Entry[%d] 不一致: got %+v want %+v", i, got, want)
+		}
+	}
+	// Leader 维护的 matchIndex[n6] 也应已推进到最后一条。
+	if leader.matchIndex[newID] != leader.Log.LastIndex() {
+		t.Errorf("Leader.matchIndex[n6] 应为 %d，实际 %d",
+			leader.Log.LastIndex(), leader.matchIndex[newID])
+	}
+	// n6 的 CommitIndex 应被 Leader 的 LeaderCommit 拉齐（<= Leader，因 n6 追上了全部已提交条目）。
+	if n6.CommitIndex < leader.CommitIndex {
+		t.Errorf("n6 CommitIndex 应 >= Leader 的 %d，实际 %d", leader.CommitIndex, n6.CommitIndex)
+	}
+	if !synced {
+		t.Error("n6 在 40 轮 tick+drain 后仍未追上 Leader 日志")
+	}
+	t.Logf("n6 已追上 Leader：日志长度=%d, CommitIndex=%d", n6.Log.LastIndex(), n6.CommitIndex)
+
+	// 第六阶段：加入 n6 后，Leader 再提一条新命令 cmd3，n6 也应被同步。
+	if !leader.Propose("cmd3") {
+		t.Fatalf("Propose cmd3 失败")
+	}
+	synced3 := false
+	for i := 0; i < 40 && !synced3; i++ {
+		tickAll6()
+		if n6.Log.LastIndex() == leader.Log.LastIndex() {
+			synced3 = true
+		}
+	}
+	if n6.Log.LastIndex() != 3 {
+		t.Errorf("cmd3 后 n6 LastIndex 应为 3，实际 %d", n6.Log.LastIndex())
+	}
+	last, ok := n6.Log.At(3)
+	if !ok || last.Command != "cmd3" {
+		t.Errorf("n6 日志第 3 条应为 cmd3，实际 %+v", last)
+	}
+	if !synced3 {
+		t.Error("n6 未同步到加入后新增的 cmd3")
+	}
+	t.Logf("新命令 cmd3 也已复制到 n6：LastIndex=%d", n6.Log.LastIndex())
+}

@@ -151,6 +151,25 @@ type returnSignal struct {
 	loc   core.SourceLoc
 }
 
+// breakSignal / continueSignal 用 panic 实现 break/continue 的非局部跳转。
+// 与 returnSignal 同理：break/continue 需要从嵌套的 if/块里跳出多层，
+// panic+recover 是树遍历解释器最简洁的实现方式。
+// 它们由最近的循环（while/for）的执行体用 defer recover 捕获：
+//   - breakSignal：跳出整个循环
+//   - continueSignal：跳过本轮剩余语句，进入下一轮（while 重新求值 cond；
+//     for 先执行 update 再求值 cond）
+//
+// 在循环外使用 break/continue 会让信号冒泡到顶层 Run，Run 的 recover 不识别
+// 这两种信号（只认 returnSignal），从而重新 panic——表现为运行时错误。
+// 这是合理的：循环外 break/continue 本就是非法的。
+type breakSignal struct {
+	loc core.SourceLoc
+}
+
+type continueSignal struct {
+	loc core.SourceLoc
+}
+
 // ===== 语句执行 =====
 
 // execStmt 执行一条语句，返回表达式语句的值（非表达式语句返回 nil）。
@@ -187,6 +206,12 @@ func (itp *Interpreter) execStmt(stmt core.Stmt, env *Environment) (any, error) 
 		}
 		// 抛出 return 信号，向上冒泡直到最近一次函数调用 / 顶层 Run
 		panic(returnSignal{value: v, loc: s.Loc})
+	case *core.BreakStmt:
+		// 抛出 break 信号，向上冒泡直到最近的循环（while/for）捕获。
+		panic(breakSignal{loc: s.Loc})
+	case *core.ContinueStmt:
+		// 抛出 continue 信号，向上冒泡直到最近的循环（while/for）捕获。
+		panic(continueSignal{loc: s.Loc})
 	case *core.IfStmt:
 		cond, err := itp.evalExpr(s.Cond, env)
 		if err != nil {
@@ -216,7 +241,17 @@ func (itp *Interpreter) execStmt(stmt core.Stmt, env *Environment) (any, error) 
 			if !b {
 				break
 			}
-			if _, err := itp.execBlock(s.Body, env); err != nil {
+			// 执行循环体，捕获 break/continue 信号：
+			//   - breakSignal：跳出整个循环（return 正常结束外层 for）。
+			//   - continueSignal：跳过本轮剩余，进入下一轮（继续外层 for）。
+			//   - returnSignal / 其他 panic：透传（让外层 callFunction/Run 处理）。
+			if err := itp.execLoopBody(s.Body, env); err != nil {
+				if err == errBreak {
+					break
+				}
+				if err == errContinue {
+					continue
+				}
 				return nil, err
 			}
 		}
@@ -232,8 +267,7 @@ func (itp *Interpreter) execStmt(stmt core.Stmt, env *Environment) (any, error) 
 			}
 		}
 		for {
-			// cond 为空视为恒真（无限循环，靠 body 内 return/break 语义跳出；
-			// 当前无 break 语句，故只能靠 return 跳出）。
+			// cond 为空视为恒真（无限循环，靠 body 内 return/break 跳出）。
 			if s.Cond != nil {
 				cond, err := itp.evalExpr(s.Cond, loopEnv)
 				if err != nil {
@@ -247,8 +281,13 @@ func (itp *Interpreter) execStmt(stmt core.Stmt, env *Environment) (any, error) 
 					break
 				}
 			}
-			if _, err := itp.execBlock(s.Body, loopEnv); err != nil {
-				return nil, err
+			// 同 WhileStmt：捕获 break/continue。
+			// 注意 continue 时仍需执行 update（C 风格 for 语义），由下方逻辑保证。
+			if err := itp.execLoopBody(s.Body, loopEnv); err != nil {
+				if err == errBreak {
+					break
+				}
+				// errContinue：跳过本轮剩余，但仍执行 update 后进入下一轮
 			}
 			if s.Update != nil {
 				if _, err := itp.execStmt(s.Update, loopEnv); err != nil {
@@ -281,6 +320,42 @@ func (itp *Interpreter) execBlock(blk *core.BlockStmt, env *Environment) (any, e
 		}
 	}
 	return last, nil
+}
+
+// errBreak / errContinue 是循环体执行时把 break/continue 的 panic 信号
+// 翻译成的哨兵错误，供 while/for 循环判断控制流。
+// 用哨兵错误（而非再次 panic）是因为 execBlock 内部的 for 循环会吞掉
+// panic——这里在 execLoopBody 里 recover 后转成错误返回，让循环骨架能
+// 用普通的 if 判断处理。
+// 用 fmt.Errorf 而非 core.NewError：它们只是内部哨兵，不需要 SourceLoc。
+var errBreak = fmt.Errorf("break signal")
+var errContinue = fmt.Errorf("continue signal")
+
+// execLoopBody 执行循环体，把 break/continue 的 panic 信号翻译成哨兵错误。
+//   - breakSignal → errBreak（循环骨架据此跳出）
+//   - continueSignal → errContinue（循环骨架据此进入下一轮）
+//   - returnSignal / 其他 panic → 重新抛出（交给外层 callFunction / Run 处理）
+//
+// 注意：真实 error（execBlock 返回的）原样透传，只有 panic 路径在此翻译。
+// 这是必要的：break/continue 从嵌套块/if 里冒泡出来需要穿过 execBlock
+// 内部的 for 循环，而那个 for 循环不会捕获 panic。
+func (itp *Interpreter) execLoopBody(blk *core.BlockStmt, env *Environment) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(breakSignal); ok {
+				err = errBreak
+				return
+			}
+			if _, ok := r.(continueSignal); ok {
+				err = errContinue
+				return
+			}
+			// returnSignal 或真实运行时 panic：重新抛出。
+			panic(r)
+		}
+	}()
+	_, e := itp.execBlock(blk, env)
+	return e
 }
 
 // ===== 表达式求值 =====

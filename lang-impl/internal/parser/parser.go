@@ -134,6 +134,10 @@ func (p *Parser) parseStmt() (core.Stmt, error) {
 		return p.parseFor()
 	case core.TokReturn:
 		return p.parseReturn()
+	case core.TokBreak:
+		return p.parseBreak()
+	case core.TokContinue:
+		return p.parseContinue()
 	case core.TokLBrace:
 		// 块语句（注意：返回 *BlockStmt，但它本身实现 Stmt）
 		return p.parseBlock()
@@ -394,6 +398,28 @@ func (p *Parser) parseReturn() (core.Stmt, error) {
 		return nil, err
 	}
 	return &core.ReturnStmt{Loc: kw.Loc, Value: val}, nil
+}
+
+// parseBreak: "break" ";"
+// 跳出最近的 while/for 循环。合法性（是否在循环内）由 interpreter 在
+// 捕获 breakSignal 时隐式保证：循环外的 break 会让信号冒泡到顶层 Run，
+// Run 的 recover 不识别它从而重新 panic（表现为运行时错误）。
+func (p *Parser) parseBreak() (core.Stmt, error) {
+	kw := p.advance() // break
+	if _, err := p.expect(core.TokSemicolon); err != nil {
+		return nil, err
+	}
+	return &core.BreakStmt{Loc: kw.Loc}, nil
+}
+
+// parseContinue: "continue" ";"
+// 跳过本轮循环剩余语句，进入下一轮（最近的 while/for）。
+func (p *Parser) parseContinue() (core.Stmt, error) {
+	kw := p.advance() // continue
+	if _, err := p.expect(core.TokSemicolon); err != nil {
+		return nil, err
+	}
+	return &core.ContinueStmt{Loc: kw.Loc}, nil
 }
 
 // parseExprStmt: expr ";"
@@ -737,6 +763,10 @@ func printNode(sb *strings.Builder, n any, indent int) {
 		if e.Value != nil {
 			printNode(sb, e.Value, indent+1)
 		}
+	case *core.BreakStmt:
+		sb.WriteString("Break\n")
+	case *core.ContinueStmt:
+		sb.WriteString("Continue\n")
 	case *core.ExprStmt:
 		sb.WriteString("ExprStmt\n")
 		printNode(sb, e.Expr, indent+1)

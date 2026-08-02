@@ -58,6 +58,7 @@ func LoadFromFile(path string) (*Pipeline, error) {
 
 // Parse 从 YAML 字节解析管道定义。
 func Parse(raw []byte) (*Pipeline, error) {
+	raw = expandEnv(raw)
 	var pf pipelineFile
 	if err := yaml.Unmarshal(raw, &pf); err != nil {
 		return nil, fmt.Errorf("解析 YAML 失败: %w", err)
@@ -90,4 +91,32 @@ func Parse(raw []byte) (*Pipeline, error) {
 		steps = append(steps, s)
 	}
 	return &Pipeline{Name: pf.Name, Steps: steps}, nil
+}
+
+// expandEnv 把 ${VAR} 替换为 os.Getenv("VAR") 的值。
+// 未设置的环境变量替换为空字符串。
+func expandEnv(raw []byte) []byte {
+	s := string(raw)
+	var out []byte
+	i := 0
+	for i < len(s) {
+		if i+1 < len(s) && s[i] == '$' && s[i+1] == '{' {
+			end := -1
+			for j := i + 2; j < len(s); j++ {
+				if s[j] == '}' {
+					end = j
+					break
+				}
+			}
+			if end > 0 {
+				name := s[i+2 : end]
+				out = append(out, []byte(os.Getenv(name))...)
+				i = end + 1
+				continue
+			}
+		}
+		out = append(out, s[i])
+		i++
+	}
+	return out
 }

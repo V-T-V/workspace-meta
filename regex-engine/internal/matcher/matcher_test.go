@@ -735,3 +735,116 @@ func TestCompileError(t *testing.T) {
 		t.Error("非法正则应返回 error")
 	}
 }
+
+// ===== 锚点 ^ $ =====
+
+func TestAnchorStartMatch(t *testing.T) {
+	// ^abc：只在行首匹配
+	m := compile(t, "^abc")
+	if !m.Match("abc") {
+		t.Error("^abc 应匹配 abc")
+	}
+	if !m.Match("abcx") {
+		t.Error("^abc 应匹配 abcx 的前缀")
+	}
+	if m.Match("xabc") {
+		t.Error("^abc 不应匹配 xabc（abc 不在行首）")
+	}
+}
+
+func TestAnchorEndMatch(t *testing.T) {
+	// abc$：只在行尾匹配
+	m := compile(t, "abc$")
+	if !m.Match("abc") {
+		t.Error("abc$ 应匹配 abc")
+	}
+	if !m.Match("xabc") {
+		t.Error("abc$ 应匹配 xabc 的后缀")
+	}
+	if m.Match("abcx") {
+		t.Error("abc$ 不应匹配 abcx（abc 不在行尾）")
+	}
+}
+
+func TestAnchorBothMatch(t *testing.T) {
+	// ^abc$：整串恰好 abc
+	m := compile(t, "^abc$")
+	if !m.Match("abc") {
+		t.Error("^abc$ 应匹配 abc")
+	}
+	if m.Match("xabc") {
+		t.Error("^abc$ 不应匹配 xabc")
+	}
+	if m.Match("abcx") {
+		t.Error("^abc$ 不应匹配 abcx")
+	}
+}
+
+func TestAnchorFindAll(t *testing.T) {
+	// ^\d+：每行的行首数字串。FindAll 从 start=0 扫描，^ 只在 start==0
+	// 或前一字符为 \n 时成立，故只在文本开头和 \n 后匹配。
+	m := compile(t, `^\d+`)
+	got := m.FindAll("12abc\n34def")
+	// 期望两处匹配："12"（位置 0）和 "34"（位置 6，紧跟 \n 后）
+	want := []Match{{0, 2, "12"}, {6, 8, "34"}}
+	if !matchesEqual(got, want) {
+		t.Errorf("FindAll(^\\d+) = %+v, want %+v", got, want)
+	}
+}
+
+func TestAnchorEndFindAll(t *testing.T) {
+	// \d+$：每行行尾数字。$ 在 pos==len 或当前字符 \n 时成立。
+	m := compile(t, `\d+$`)
+	got := m.FindAll("ab12\ncd34")
+	// "12"（位置 2..4，其后是 \n）和 "34"（位置 7..9，到结尾）
+	want := []Match{{2, 4, "12"}, {7, 9, "34"}}
+	if !matchesEqual(got, want) {
+		t.Errorf("FindAll(\\d+$) = %+v, want %+v", got, want)
+	}
+}
+
+func TestAnchorIsFullMatch(t *testing.T) {
+	// ^abc$ 应等价于 IsFullMatch 语义
+	m := compile(t, "^abc$")
+	if !m.Match("abc") {
+		t.Error("^abc$ 应匹配 abc")
+	}
+	// 注意：因为 ^ 和 $ 都锚定，对 xabc 应整体不匹配
+	if m.Match("xabc") {
+		t.Error("^abc$ 不应匹配 xabc")
+	}
+}
+
+func TestAnchorInGroup(t *testing.T) {
+	// 锚点在分组内也要工作
+	m := compile(t, "(^abc)")
+	if !m.Match("abc") {
+		t.Error("(^abc) 应匹配 abc")
+	}
+	if m.Match("xabc") {
+		t.Error("(^abc) 不应匹配 xabc")
+	}
+}
+
+func TestAnchorMultilineDollar(t *testing.T) {
+	// $ 在多行下认 \n 边界：a$ 应在 "xa\nyb" 里匹配 a（其后是 \n）
+	m := compile(t, "a$")
+	if !m.Match("xa\nyb") {
+		t.Error("a$ 应匹配 'xa\nyb' 里的 a（a 后跟 \n）")
+	}
+	// 但不应匹配没有行尾边界的中间 a
+	if m.Match("xayb") {
+		t.Error("a$ 不应匹配 xayb（a 不在行尾）")
+	}
+}
+
+func TestAnchorStartMultiline(t *testing.T) {
+	// ^ 在多行下认 \n 边界：^b 应在 "a\nbc" 里匹配 b（前是 \n）
+	m := compile(t, "^b")
+	if !m.Match("a\nbc") {
+		t.Error("^b 应匹配 'a\nbc' 里的 b（前是 \n）")
+	}
+	if m.Match("abc") {
+		t.Error("^b 不应匹配 abc（b 不在行首）")
+	}
+}

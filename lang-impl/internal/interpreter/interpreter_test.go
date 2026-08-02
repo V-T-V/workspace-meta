@@ -704,3 +704,126 @@ func TestTemplateStringNoInterp(t *testing.T) {
 		t.Errorf("无插值字符串应不变")
 	}
 }
+
+// ===== break / continue =====
+
+func TestBreakFor(t *testing.T) {
+	// 0+1+2+3+4 = 10，i==5 时 break
+	src := `let total = 0;
+for (let i = 0; i < 100; i = i + 1) {
+  if (i == 5) { break; }
+  total = total + i;
+}
+return total;`
+	if got := runInt(t, src); got != 10 {
+		t.Errorf("break 应让循环停在 i==5，累加应为 10，实际 %d", got)
+	}
+}
+
+func TestBreakWhile(t *testing.T) {
+	src := `let i = 0;
+let total = 0;
+while (i < 100) {
+  if (i == 3) { break; }
+  total = total + i;
+  i = i + 1;
+}
+return total;` // 0+1+2 = 3
+	if got := runInt(t, src); got != 3 {
+		t.Errorf("while break 累加应为 3，实际 %d", got)
+	}
+}
+
+func TestBreakNested(t *testing.T) {
+	// break 只跳出最近一层循环（内层），外层继续。
+	// 内层 j 循环每次在 j==2 break；外层 i 跑 0..2。
+	// 每轮内层累加 j=0,1（2 break）→ 每轮 +1，3 轮 → 3。
+	src := `let total = 0;
+for (let i = 0; i < 3; i = i + 1) {
+  for (let j = 0; j < 10; j = j + 1) {
+    if (j == 2) { break; }
+    total = total + j;
+  }
+}
+return total;` // 3 轮 × (0+1) = 3
+	if got := runInt(t, src); got != 3 {
+		t.Errorf("嵌套 break 应只跳内层，累加应为 3，实际 %d", got)
+	}
+}
+
+func TestBreakInIfBranch(t *testing.T) {
+	// break 在 if-else 的嵌套块里也要能正确冒泡到循环
+	src := `let i = 0;
+let total = 0;
+while (i < 100) {
+  i = i + 1;
+  if (i == 4) {
+    { break; }
+  }
+  total = total + i;
+}
+return total;` // i=1,2,3 累加 → 6，i=4 时 break
+	if got := runInt(t, src); got != 6 {
+		t.Errorf("嵌套块里的 break 应跳出循环，累加应为 6，实际 %d", got)
+	}
+}
+
+func TestContinueFor(t *testing.T) {
+	// continue 跳过本轮：i==2 不累加 → 0+1+3+4 = 8
+	src := `let total = 0;
+for (let i = 0; i < 5; i = i + 1) {
+  if (i == 2) { continue; }
+  total = total + i;
+}
+return total;`
+	if got := runInt(t, src); got != 8 {
+		t.Errorf("continue 应跳过 i==2，累加应为 8，实际 %d", got)
+	}
+}
+
+func TestContinueWhile(t *testing.T) {
+	// while continue：跳过本轮剩余，仍需 i=i+1，否则死循环。
+	src := `let i = 0;
+let total = 0;
+while (i < 5) {
+  i = i + 1;
+  if (i == 3) { continue; }
+  total = total + i;
+}
+return total;` // i=1,2,(3 skip),4,5 → 1+2+4+5 = 12
+	if got := runInt(t, src); got != 12 {
+		t.Errorf("while continue 累加应为 12，实际 %d", got)
+	}
+}
+
+func TestContinueNested(t *testing.T) {
+	// 内层 continue 不影响外层。内层每次 j==1 continue（跳 j 累加），
+	// 所以内层累加永远是 j=0 → 每轮 +0；3 轮 → 0。
+	src := `let total = 0;
+for (let i = 0; i < 3; i = i + 1) {
+  for (let j = 0; j < 3; j = j + 1) {
+    if (j == 1) { continue; }
+    total = total + j;
+  }
+}
+return total;` // 3 轮 × (0 + skip(1) + 2) = 3 × 2 = 6
+	if got := runInt(t, src); got != 6 {
+		t.Errorf("嵌套 continue 累加应为 6，实际 %d", got)
+	}
+}
+
+func TestBreakReturnInteraction(t *testing.T) {
+	// break 不应吞掉 return：函数内 break 后函数仍能正常返回
+	src := `fn sum(limit) {
+  let total = 0;
+  for (let i = 0; i < 100; i = i + 1) {
+    if (i == limit) { break; }
+    total = total + i;
+  }
+  return total;
+}
+return sum(4);` // 0+1+2+3 = 6
+	if got := runInt(t, src); got != 6 {
+		t.Errorf("函数内 break 后 return 应为 6，实际 %d", got)
+	}
+}

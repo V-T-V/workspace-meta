@@ -185,6 +185,25 @@ type ReturnStmt struct {
 func (ReturnStmt) stmtNode()            {}
 func (s ReturnStmt) NodeLoc() SourceLoc { return s.Loc }
 
+// BreakStmt 跳出循环：break;
+// 只在 while/for 循环体内合法；解释器通过 panic(breakSignal{}) 实现非局部跳转，
+// 由最近的循环语句（while/for）的执行体用 defer recover 捕获。
+type BreakStmt struct {
+	Loc SourceLoc
+}
+
+func (BreakStmt) stmtNode()            {}
+func (s BreakStmt) NodeLoc() SourceLoc { return s.Loc }
+
+// ContinueStmt 跳过本轮循环剩余语句、进入下一轮：continue;
+// 同 BreakStmt，由最近的循环语句捕获 continueSignal。
+type ContinueStmt struct {
+	Loc SourceLoc
+}
+
+func (ContinueStmt) stmtNode()            {}
+func (s ContinueStmt) NodeLoc() SourceLoc { return s.Loc }
+
 // ExprStmt 表达式语句：expr;
 type ExprStmt struct {
 	Loc  SourceLoc

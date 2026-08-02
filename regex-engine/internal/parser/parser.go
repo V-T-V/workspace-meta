@@ -241,9 +241,12 @@ func (p *Parser) parseAtom() (*ast.Node, error) {
 	case '|', ')':
 		return nil, fmt.Errorf("位置 %d: 未预期的 %q", p.pos, string(c))
 	case '^', '$':
-		// 锚点 ^ $ 暂不支持（M2 候选）：NFA 状态集合模拟难以表达"位置"语义。
-		// 若解析却返回永远匹配失败的 NFA，会造成"形似神不似"——故直接报错明示不支持。
-		return nil, fmt.Errorf("位置 %d: 锚点 %q 暂不支持（M2 候选）", p.pos, string(c))
+		// 锚点 ^（行首）/ $（行尾）。零宽断言，不消费字符：
+		//   ^ 在 pos==0 或前一字符是 \n 时成立
+		//   $ 在 pos==len 或当前字符是 \n 时成立
+		// 位置检查由 matcher 的 ε 闭包在遍历锚点边时执行（见 nfa.addAnchor）。
+		p.advance()
+		return ast.NewAnchor(byte(c)), nil
 	default:
 		p.advance()
 		return p.newLiteral(c), nil

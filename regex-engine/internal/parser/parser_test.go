@@ -174,16 +174,35 @@ func TestParseUnclosedCharClassError(t *testing.T) {
 	}
 }
 
-func TestParseAnchorNotSupported(t *testing.T) {
-	// 锚点 M2 才支持，当前应报错
-	_, err := Parse("^abc")
-	if err == nil {
-		t.Error("^ 应报错（M2 不支持）")
+func TestParseAnchorSupported(t *testing.T) {
+	// 锚点 ^ / $ 现已支持：应能解析（不报错），且生成 KindAnchor 节点。
+	cases := []string{"^abc", "abc$", "^abc$", "^a|b$", "(^abc)", "a^b"}
+	for _, pat := range cases {
+		n, err := Parse(pat)
+		if err != nil {
+			t.Errorf("锚点正则 %q 应能解析, got err: %v", pat, err)
+			continue
+		}
+		if !containsAnchor(n) {
+			t.Errorf("锚点正则 %q 解析出的 AST 应含 KindAnchor 节点", pat)
+		}
 	}
-	_, err = Parse("abc$")
-	if err == nil {
-		t.Error("$ 应报错（M2 不支持）")
+}
+
+// containsAnchor 递归检查 AST 是否含至少一个 KindAnchor 节点。
+func containsAnchor(n *ast.Node) bool {
+	if n == nil {
+		return false
 	}
+	if n.Kind == ast.KindAnchor {
+		return true
+	}
+	for _, c := range n.Children {
+		if containsAnchor(c) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestParseComplex(t *testing.T) {

@@ -24,11 +24,18 @@ type State int
 // 触发对应第 N 个捕获组的"进入"/"离开"事件）。仅 ε 边会带捕获标记：
 // 进入分组用一条 CaptureStart=N 的 ε 边，离开用一条 CaptureEnd=N 的 ε 边。
 // -1（默认）表示不参与捕获。
+//
+// Anchor（仅当 IsAnchor=true）把这条 ε 边标记为零宽锚点 ^ 或 $：
+// matcher 的 ε 闭包在遍历到锚点边时，不无条件通过，而是检查当前位置是否
+// 满足锚点条件（^ = 行首，$ = 行尾），满足才通过。这样把"位置"语义
+// 编码进了状态集合模拟——无需改动字符消费主循环。
 type Edge struct {
 	To           State
 	Epsilon      bool
-	CaptureStart int // >=0 表示进入第 N 个捕获组；-1 表示无
-	CaptureEnd   int // >=0 表示离开第 N 个捕获组；-1 表示无
+	CaptureStart int  // >=0 表示进入第 N 个捕获组；-1 表示无
+	CaptureEnd   int  // >=0 表示离开第 N 个捕获组；-1 表示无
+	IsAnchor     bool // true 时本边是零宽锚点（Epsilon 隐含为 true）
+	Anchor       byte // IsAnchor=true 时为 '^' 或 '$'
 	// matcher 判断输入字符是否匹配此边（epsilon=false 时用）。
 	// 对于字面量是 c == char；对于 . 是 true；对于 [...] 是集合包含。
 	matcher func(rune) bool
@@ -44,6 +51,20 @@ func (e Edge) Match(r rune) bool {
 		return false
 	}
 	return e.matcher(r)
+}
+
+// addAnchor 加一条零宽锚点边（^ 或 $）。
+// 锚点是 ε 边的特殊形式：不消费字符，但仅在满足位置条件时由 matcher 放行。
+// anchor 为 '^' 或 '$'。
+func (n *NFA) addAnchor(from, to State, anchor byte) {
+	n.transitions[from] = append(n.transitions[from], Edge{
+		To:           to,
+		Epsilon:      true, // 锚点是 ε 边（零宽）
+		IsAnchor:     true,
+		Anchor:       anchor,
+		CaptureStart: noCapture,
+		CaptureEnd:   noCapture,
+	})
 }
 
 // NFA 是一个完整的非确定性有限自动机。
@@ -241,16 +262,14 @@ func (n *NFA) build(node *ast.Node) (State, State) {
 		return s, e
 
 	case ast.KindAnchor:
-		// ^ $ 锚点简化处理：作为 ε 转移，匹配时由 matcher 特判
+		// ^ $ 锚点：构造为带 IsAnchor 标记的 ε 边。
+		// matcher 的 ε 闭包遍历到该边时检查当前位置是否满足锚点条件
+		// （^ = 行首：pos==0 或 runes[pos-1]=='\n'；
+		//  $ = 行尾：pos==len 或 runes[pos]=='\n'），满足才放行。
+		// 这把"位置"语义编码进状态集合模拟，无需改动字符消费主循环。
 		s := n.newState()
 		e := n.newState()
-		a := node.Anchor
-		n.addChar(s, e, func(r rune) bool {
-			// 锚点简化：在 matcher 里通过特殊字符触发位置检查
-			// 这里用一个标记字符（匹配器会特殊处理 ^ $）
-			_ = a
-			return false // 锚点逻辑在 matcher.Match 里处理，这里返回 false 避免 NFA 误消费
-		})
+		n.addAnchor(s, e, node.Anchor)
 		return s, e
 	}
 	// 不应到达

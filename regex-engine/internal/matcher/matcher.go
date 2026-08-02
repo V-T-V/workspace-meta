@@ -42,7 +42,7 @@ func (m *Matcher) Match(text string) bool {
 // 实现：从 start 开始跑 NFA 到结尾，验证最终状态集合含接受状态。
 func (m *Matcher) IsFullMatch(text string) bool {
 	runes := []rune(text)
-	current := m.epsilonClosure(map[nfa.State]bool{m.nfa.Start: true})
+	current := m.epsilonClosure(map[nfa.State]bool{m.nfa.Start: true}, runes, 0)
 	for i := 0; i < len(runes); i++ {
 		next := map[nfa.State]bool{}
 		for s := range current {
@@ -55,7 +55,7 @@ func (m *Matcher) IsFullMatch(text string) bool {
 		if len(next) == 0 {
 			return false
 		}
-		current = m.epsilonClosure(next)
+		current = m.epsilonClosure(next, runes, i+1)
 	}
 	return current[m.nfa.Accept]
 }
@@ -63,7 +63,7 @@ func (m *Matcher) IsFullMatch(text string) bool {
 // matchFrom 从 start 位置开始，跑 NFA，报告是否能到达接受状态。
 // 用于 Match（子串匹配）：尝试从每个 start 位置找最早匹配。
 func (m *Matcher) matchFrom(runes []rune, start int) bool {
-	current := m.epsilonClosure(map[nfa.State]bool{m.nfa.Start: true})
+	current := m.epsilonClosure(map[nfa.State]bool{m.nfa.Start: true}, runes, start)
 	// start 位置就可能是接受（如 a* 对空串匹配）
 	if current[m.nfa.Accept] {
 		return true
@@ -80,7 +80,7 @@ func (m *Matcher) matchFrom(runes []rune, start int) bool {
 		if len(next) == 0 {
 			return false
 		}
-		current = m.epsilonClosure(next)
+		current = m.epsilonClosure(next, runes, i+1)
 		if current[m.nfa.Accept] {
 			return true
 		}
@@ -158,7 +158,7 @@ func (m *Matcher) ReplaceAll(text, replacement string) string {
 // 若从 start 起任何时刻（含 start 本身，如 a* 对空串）都不能接受，返回 -1。
 // 这是 POSIX "最左最长" 语义：记录最后一次进入接受态的位置。
 func (m *Matcher) matchLongestFrom(runes []rune, start int) int {
-	current := m.epsilonClosure(map[nfa.State]bool{m.nfa.Start: true})
+	current := m.epsilonClosure(map[nfa.State]bool{m.nfa.Start: true}, runes, start)
 	lastAccept := -1
 	if current[m.nfa.Accept] {
 		// start 位置即接受（空匹配可能）
@@ -176,7 +176,7 @@ func (m *Matcher) matchLongestFrom(runes []rune, start int) int {
 		if len(next) == 0 {
 			break
 		}
-		current = m.epsilonClosure(next)
+		current = m.epsilonClosure(next, runes, i+1)
 		if current[m.nfa.Accept] {
 			lastAccept = i + 1
 		}
@@ -192,7 +192,7 @@ func (m *Matcher) matchLongestFrom(runes []rune, start int) int {
 // 尝试消费"的回溯式惰性。因此这里采用"第一次进入接受态即返回"的近似：对 a*?、a+?、
 // a?? 这类惰性量词，它给出与标准回溯引擎一致的"最短左匹配"结果。
 func (m *Matcher) matchShortestFrom(runes []rune, start int) int {
-	current := m.epsilonClosure(map[nfa.State]bool{m.nfa.Start: true})
+	current := m.epsilonClosure(map[nfa.State]bool{m.nfa.Start: true}, runes, start)
 	if current[m.nfa.Accept] {
 		return start // start 位置即接受（空匹配可能）
 	}
@@ -208,7 +208,7 @@ func (m *Matcher) matchShortestFrom(runes []rune, start int) int {
 		if len(next) == 0 {
 			return -1
 		}
-		current = m.epsilonClosure(next)
+		current = m.epsilonClosure(next, runes, i+1)
 		if current[m.nfa.Accept] {
 			return i + 1
 		}
@@ -219,8 +219,10 @@ func (m *Matcher) matchShortestFrom(runes []rune, start int) int {
 // reachesAccept 已删除（合并到 IsFullMatch）。
 
 // epsilonClosure 求状态集合的 ε 闭包：从这些状态出发，仅通过 ε 边能到达的所有状态。
+// pos 是当前光标位置（下一个待消费字符的下标，可为 len(runes)）；
+// 锚点边 ^ / $ 用它做位置判定（^ 行首 / $ 行尾）。
 // 用 BFS 实现。
-func (m *Matcher) epsilonClosure(states map[nfa.State]bool) map[nfa.State]bool {
+func (m *Matcher) epsilonClosure(states map[nfa.State]bool, runes []rune, pos int) map[nfa.State]bool {
 	closure := map[nfa.State]bool{}
 	var queue []nfa.State
 	for s := range states {
@@ -231,13 +233,43 @@ func (m *Matcher) epsilonClosure(states map[nfa.State]bool) map[nfa.State]bool {
 		s := queue[0]
 		queue = queue[1:]
 		for _, edge := range m.nfa.Transitions(s) {
-			if edge.Epsilon && !closure[edge.To] {
+			if !edge.Epsilon {
+				continue
+			}
+			if edge.IsAnchor && !anchorHolds(edge.Anchor, runes, pos) {
+				// 锚点位置条件不满足：此 ε 边不放行。
+				continue
+			}
+			if !closure[edge.To] {
 				closure[edge.To] = true
 				queue = append(queue, edge.To)
 			}
 		}
 	}
 	return closure
+}
+
+// anchorHolds 判断锚点（'^' 或 '$'）在光标位置 pos 是否成立。
+//
+//	^ 行首：pos==0 或前一字符是 '\n'
+//	$ 行尾：pos==len(runes) 或当前字符是 '\n'
+//
+// 这是多行模式（multiline）语义——单行模式下 $ 通常也允许结尾 \n，
+// 此处统一采用 ^/$ 都认 \n 边界的宽松定义，与多数正则引擎的默认多行行为一致。
+func anchorHolds(anchor byte, runes []rune, pos int) bool {
+	switch anchor {
+	case '^':
+		if pos == 0 {
+			return true
+		}
+		return runes[pos-1] == '\n'
+	case '$':
+		if pos == len(runes) {
+			return true
+		}
+		return runes[pos] == '\n'
+	}
+	return false
 }
 
 // GroupMatch 是一个捕获组的匹配结果。
@@ -316,7 +348,7 @@ func (m *Matcher) matchLongestWithGroupsFrom(runes []rune, start int) (int, []in
 
 	// frontier: state -> 捕获快照
 	frontier := map[nfa.State][]int{m.nfa.Start: newCaps()}
-	frontier = m.closureWithCaps(frontier, start)
+	frontier = m.closureWithCaps(frontier, start, runes)
 
 	lastAccept := -1
 	var lastCaps []int
@@ -342,7 +374,7 @@ func (m *Matcher) matchLongestWithGroupsFrom(runes []rune, start int) (int, []in
 		if len(next) == 0 {
 			break
 		}
-		frontier = m.closureWithCaps(next, i+1)
+		frontier = m.closureWithCaps(next, i+1, runes)
 		if caps, ok := frontier[m.nfa.Accept]; ok {
 			lastAccept = i + 1
 			lastCaps = cloneCaps(caps)
@@ -371,7 +403,7 @@ func (m *Matcher) matchShortestWithGroupsFrom(runes []rune, start int) (int, []i
 
 	// frontier: state -> 捕获快照
 	frontier := map[nfa.State][]int{m.nfa.Start: newCaps()}
-	frontier = m.closureWithCaps(frontier, start)
+	frontier = m.closureWithCaps(frontier, start, runes)
 	if caps, ok := frontier[m.nfa.Accept]; ok {
 		return start, cloneCaps(caps) // start 位置即接受
 	}
@@ -393,7 +425,7 @@ func (m *Matcher) matchShortestWithGroupsFrom(runes []rune, start int) (int, []i
 		if len(next) == 0 {
 			return -1, nil
 		}
-		frontier = m.closureWithCaps(next, i+1)
+		frontier = m.closureWithCaps(next, i+1, runes)
 		if caps, ok := frontier[m.nfa.Accept]; ok {
 			return i + 1, cloneCaps(caps) // 第一次接受即返回
 		}
@@ -402,13 +434,15 @@ func (m *Matcher) matchShortestWithGroupsFrom(runes []rune, start int) (int, []i
 }
 
 // closureWithCaps 求带捕获快照的 ε 闭包。pos 是当前光标位置（捕获事件记录此值）。
+// runes 用于锚点边的位置判定（^ / $）。
 // BFS：弹出 (s, caps)，对其每条 ε 边：
+//   - 锚点边（IsAnchor）：仅当 anchorHolds 时通过，caps 不变
 //   - CaptureStart=N：newcaps = caps 副本，置 newcaps[2N]=pos
 //   - CaptureEnd=N：newcaps = caps 副本，置 newcaps[2N+1]=pos
 //   - 无标记：直接复用 caps
 //
 // 若目标状态已存在，保留先到的那条（first-wins）。
-func (m *Matcher) closureWithCaps(seed map[nfa.State][]int, pos int) map[nfa.State][]int {
+func (m *Matcher) closureWithCaps(seed map[nfa.State][]int, pos int, runes []rune) map[nfa.State][]int {
 	closure := map[nfa.State][]int{}
 	var queue []nfa.State
 	for s, caps := range seed {
@@ -421,6 +455,10 @@ func (m *Matcher) closureWithCaps(seed map[nfa.State][]int, pos int) map[nfa.Sta
 		caps := closure[s]
 		for _, edge := range m.nfa.Transitions(s) {
 			if !edge.Epsilon {
+				continue
+			}
+			// 锚点边：位置不满足则不放行。
+			if edge.IsAnchor && !anchorHolds(edge.Anchor, runes, pos) {
 				continue
 			}
 			var nextCaps []int

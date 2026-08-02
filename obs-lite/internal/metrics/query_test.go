@@ -255,3 +255,91 @@ func TestRateSingle(t *testing.T) {
 		t.Error("单个点 Rate 应为 0")
 	}
 }
+
+// ===== Percentile =====
+//
+// 构造一个已知分布并验证线性插值百分位估算。
+// 用 Histogram.Observe 真实累积，再 Data() 取出 HistogramData，确保走完整采集链路。
+//
+// 桶 [1, 2, 3]，观测值 {0.5, 1.5, 2.5, 2.5}（共 4 个）：
+//
+//	累计计数：[1, 2, 4, 4]（最后一个是 +Inf 桶，Count == 总数 4）
+//	- p50  target=2  → 落桶 1(ub=2)  → 2 + 0   = 2.0
+//	- p90  target=3.6→ 落桶 2(ub=3)  → 2 + 0.8 = 2.8
+//	- p99  target=3.96→落桶 2(ub=3)  → 2 + 0.98= 2.98
+func TestPercentile(t *testing.T) {
+	hist := NewHistogram("latency", []float64{1, 2, 3})
+	for _, v := range []float64{0.5, 1.5, 2.5, 2.5} {
+		hist.Observe(v, nil)
+	}
+	data := hist.Data()
+	if len(data) != 1 {
+		t.Fatalf("应有 1 组 histogram 数据（无标签），实际 %d", len(data))
+	}
+
+	cases := []struct {
+		name string
+		p    float64
+		want float64
+	}{
+		{"p50", 50, 2.0},
+		{"p90", 90, 2.8},
+		{"p99", 99, 2.98},
+	}
+	for _, c := range cases {
+		got := Percentile(data[0], c.p)
+		if math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("%s = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestPercentileBoundaries(t *testing.T) {
+	hist := NewHistogram("latency", []float64{1, 2, 3})
+	for _, v := range []float64{0.5, 1.5, 2.5, 2.5} {
+		hist.Observe(v, nil)
+	}
+	data := hist.Data()[0]
+
+	// p0 返回 0（最低桶下界）。
+	if got := Percentile(data, 0); got != 0 {
+		t.Errorf("p0 应返回 0，实际 %v", got)
+	}
+	// p100 target=4 落到 ub=3 的桶，fraction=1 → 返回桶上界 3。
+	if got := Percentile(data, 100); got != 3 {
+		t.Errorf("p100 应返回 3（最大有限桶上界），实际 %v", got)
+	}
+	// p > 100 应被截断为 100，结果同上。
+	if got := Percentile(data, 150); got != 3 {
+		t.Errorf("p150 应截断为 p100 → 3，实际 %v", got)
+	}
+	// 负百分位视为 0。
+	if got := Percentile(data, -5); got != 0 {
+		t.Errorf("负百分位应返回 0，实际 %v", got)
+	}
+}
+
+func TestPercentileAllInFirstBucket(t *testing.T) {
+	// 所有观测都落在第一个桶内：p50 应落在桶 0，在 [0, ub0] 间插值。
+	hist := NewHistogram("latency", []float64{1, 2, 3})
+	for i := 0; i < 10; i++ {
+		hist.Observe(0.1, nil) // 全部 <= 1
+	}
+	data := hist.Data()[0]
+	// 桶 0(ub=1) count=10。target=5,prevCount=0,bucketCount=10,fraction=0.5 → 0+0.5*1=0.5
+	if got := Percentile(data, 50); math.Abs(got-0.5) > 1e-9 {
+		t.Errorf("全落在首桶时 p50 应在 [0,1] 中点 = 0.5，实际 %v", got)
+	}
+}
+
+func TestPercentileEmpty(t *testing.T) {
+	// 空 histogram（无观测）返回 0，不 panic。
+	empty := types.HistogramData{
+		Name:    "x",
+		Buckets: []types.HistogramBucket{{UpperBound: 1, Count: 0}, {UpperBound: math.Inf(1), Count: 0}},
+		Count:   0,
+	}
+	if got := Percentile(empty, 50); got != 0 {
+		t.Errorf("空 histogram 应返回 0，实际 %v", got)
+	}
+}

@@ -18,15 +18,17 @@ import (
 
 // keywords 是关键字表（识别标识符后判断是否为关键字）。
 var keywords = map[string]core.TokenType{
-	"let":    core.TokLet,
-	"fn":     core.TokFn,
-	"if":     core.TokIf,
-	"else":   core.TokElse,
-	"while":  core.TokWhile,
-	"for":    core.TokFor,
-	"return": core.TokReturn,
-	"true":   core.TokTrue,
-	"false":  core.TokFalse,
+	"let":      core.TokLet,
+	"fn":       core.TokFn,
+	"if":       core.TokIf,
+	"else":     core.TokElse,
+	"while":    core.TokWhile,
+	"for":      core.TokFor,
+	"return":   core.TokReturn,
+	"break":    core.TokBreak,
+	"continue": core.TokContinue,
+	"true":     core.TokTrue,
+	"false":    core.TokFalse,
 }
 
 // Lexer 是词法分析器，逐字符消费源码。

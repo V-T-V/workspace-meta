@@ -8,6 +8,7 @@
 package metrics
 
 import (
+	"math"
 	"sort"
 
 	"github.com/QiuShichang/obs-lite/internal/types"
@@ -117,4 +118,84 @@ func Rate(points []types.MetricPoint, name string) float64 {
 		return 0
 	}
 	return (last.Value - prev.Value) / dt
+}
+
+// Percentile 从 histogram 数据估算指定百分位的值。
+// 用线性插值法在桶之间估算。
+// p 是 0-100 的百分位（如 50=中位数, 90=P90, 99=P99）。
+//
+// 实现思路（与 Prometheus quantile 同款算法）：
+//   - Buckets[i].Count 是"上界 <= Buckets[i].UpperBound"的累计观测数，
+//     最后一个桶的 UpperBound 为 +Inf、Count == hist.Count。
+//   - 目标排名 target = p/100 * total，在累计计数序列里找到第一个
+//     Count >= target 的桶 bi（即第 p 百分位落在该桶内）。
+//   - 用 bi 的下界（即上一个桶的上界 loBound）与上界（hiBound）线性插值：
+//     fraction = (target - prevCount) / (bi.Count - prevCount)
+//     result = loBound + fraction * (hiBound - loBound)
+//
+// 边界处理：p <= 0 返回最低桶下界；p >= 100 或 target 落到 +Inf 桶时
+// 返回最后一个有限桶的上界（避免返回 +Inf）。空 histogram 返回 0。
+func Percentile(hist types.HistogramData, p float64) float64 {
+	// 异常输入归一化。
+	if len(hist.Buckets) == 0 || hist.Count == 0 {
+		return 0
+	}
+	if p <= 0 {
+		return 0
+	}
+	if p > 100 {
+		p = 100
+	}
+
+	// 目标观测排名（1-based 语义：target=1 表示第一个观测）。
+	target := p / 100 * float64(hist.Count)
+
+	// 找到第一个累计计数 >= target 的桶。
+	bi := -1
+	for i, b := range hist.Buckets {
+		if float64(b.Count) >= target {
+			bi = i
+			break
+		}
+	}
+	if bi < 0 {
+		// 全部桶都没覆盖到（理论上 +Inf 桶必覆盖），返回最大有限上界。
+		return finiteUpper(hist.Buckets)
+	}
+
+	hiBound := hist.Buckets[bi].UpperBound
+	// 落到 +Inf 桶：拿不到有限上界，返回最大有限桶上界。
+	if math.IsInf(hiBound, 1) {
+		return finiteUpper(hist.Buckets)
+	}
+
+	// bi 桶的下界 = 上一个桶的上界（第一个桶下界视为 0）。
+	var loBound float64
+	var prevCount float64
+	if bi > 0 {
+		loBound = hist.Buckets[bi-1].UpperBound
+		prevCount = float64(hist.Buckets[bi-1].Count)
+	}
+
+	// 该桶内的观测数（累计差）。
+	bucketCount := float64(hist.Buckets[bi].Count) - prevCount
+	if bucketCount <= 0 {
+		// 桶内无观测（理论不该发生），直接返回桶上界。
+		return hiBound
+	}
+
+	// 在 [loBound, hiBound] 内线性插值。
+	fraction := (target - prevCount) / bucketCount
+	return loBound + fraction*(hiBound-loBound)
+}
+
+// finiteUpper 返回 buckets 里最后一个有限上界（即 +Inf 桶之前的那个桶的上界）。
+// buckets 至少含一个 +Inf 桶；调用方保证 len(buckets) > 0。
+func finiteUpper(buckets []types.HistogramBucket) float64 {
+	for i := len(buckets) - 1; i >= 0; i-- {
+		if !math.IsInf(buckets[i].UpperBound, 1) {
+			return buckets[i].UpperBound
+		}
+	}
+	return 0
 }
