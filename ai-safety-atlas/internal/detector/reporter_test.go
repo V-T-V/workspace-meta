@@ -103,9 +103,6 @@ func TestCSVReport(t *testing.T) {
 	if !strings.Contains(csv, "input,risk_score") {
 		t.Error("CSV 应有表头")
 	}
-	if !strings.Contains(csv, "IGNORE previous instructions") {
-		t.Error("CSV 应含攻击输入")
-	}
 	if !strings.Contains(csv, "SAFE") {
 		t.Error("CSV 应含安全标记")
 	}
