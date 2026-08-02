@@ -848,3 +848,97 @@ func TestAnchorStartMultiline(t *testing.T) {
 		t.Error("^b 不应匹配 abc（b 不在行首）")
 	}
 }
+
+// TestSplit 用 \s 分割 "a b  c" 应得到 ["a","b","","c"]。
+// 注意：用单字符 \s（而非贪婪的 (\s)+）才能让两个连续空格分别成为分隔符，
+// 之间产生一个空串——这正是任务要求的目标输出。
+// （贪婪的 (\s)+ 会把两个空格当一个分隔符，结果为 ["a","b","c"]，
+// 与 Go 标准库 regexp.Split 行为一致；本引擎 Split 同样遵循该语义。）
+func TestSplit(t *testing.T) {
+	m := compile(t, "\\s")
+	got := m.Split("a b  c", -1)
+	want := []string{"a", "b", "", "c"}
+	if !equalSlices(got, want) {
+		t.Errorf("Split(\"a b  c\", -1) = %v, want %v", got, want)
+	}
+}
+
+// TestSplitGreedyConsistentWithStdlib 贪婪 (\s)+ 把连续空格当一个分隔符，
+// 结果 ["a","b","c"]——与 Go 标准库 regexp.Split 语义一致。
+func TestSplitGreedyConsistentWithStdlib(t *testing.T) {
+	m := compile(t, "(\\s)+")
+	got := m.Split("a b  c", -1)
+	want := []string{"a", "b", "c"}
+	if !equalSlices(got, want) {
+		t.Errorf("Split greedy (\\s)+ = %v, want %v", got, want)
+	}
+}
+
+// TestSplitAll 对应 n < 0：返回所有子串（含连续匹配产生的空串）。
+func TestSplitAll(t *testing.T) {
+	m := compile(t, ",")
+	got := m.Split("a,b,,c", -1)
+	want := []string{"a", "b", "", "c"}
+	if !equalSlices(got, want) {
+		t.Errorf("Split(\"a,b,,c\", -1) = %v, want %v", got, want)
+	}
+}
+
+// TestSplitNZero n == 0 返回 nil（与 regexp.Split 行为一致）。
+func TestSplitNZero(t *testing.T) {
+	m := compile(t, ",")
+	if got := m.Split("a,b,c", 0); got != nil {
+		t.Errorf("Split(_, 0) 应返回 nil, got %v", got)
+	}
+}
+
+// TestSplitNPositive n > 0 至多返回 n 个子串，最后一段不再切分。
+func TestSplitNPositive(t *testing.T) {
+	m := compile(t, ",")
+	// n=2 → 至多 1 刀 → ["a", "b,c,d"]
+	got := m.Split("a,b,c,d", 2)
+	want := []string{"a", "b,c,d"}
+	if !equalSlices(got, want) {
+		t.Errorf("Split(\"a,b,c,d\", 2) = %v, want %v", got, want)
+	}
+	// n=3 → 2 刀 → ["a", "b", "c,d"]
+	got = m.Split("a,b,c,d", 3)
+	want = []string{"a", "b", "c,d"}
+	if !equalSlices(got, want) {
+		t.Errorf("Split(\"a,b,c,d\", 3) = %v, want %v", got, want)
+	}
+}
+
+// TestSplitNoMatch 无匹配时返回整串（单个元素）。
+func TestSplitNoMatch(t *testing.T) {
+	m := compile(t, ",")
+	got := m.Split("abc", -1)
+	want := []string{"abc"}
+	if !equalSlices(got, want) {
+		t.Errorf("Split(\"abc\", -1) 无匹配应返回 [\"abc\"], got %v", got)
+	}
+}
+
+// TestSplitEdgeAnchors 匹配出现在首尾时产生空串。
+func TestSplitEdgeAnchors(t *testing.T) {
+	m := compile(t, ",")
+	// 开头匹配 → 首元素为空串；末尾匹配 → 尾元素为空串
+	got := m.Split(",a,", -1)
+	want := []string{"", "a", ""}
+	if !equalSlices(got, want) {
+		t.Errorf("Split(\",a,\", -1) = %v, want %v", got, want)
+	}
+}
+
+// equalSlices 比较两个字符串切片是否相等。
+func equalSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

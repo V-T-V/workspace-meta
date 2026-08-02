@@ -31,6 +31,11 @@ type Step struct {
 	// 而非让整个管道失败。config 同 sink 的 config。
 	// 形如 {connector: "csv", config: {path: "dead.csv"}}。仅对 transform/sink 有意义。
 	DeadLetter *DeadLetterConfig `json:"dead_letter,omitempty"`
+
+	// When 是步骤执行条件（YAML when:）。为空则总是执行；
+	// 非空时由 runner 做简单求值（仅支持 {{stepID.rows_out}} OP number 形式，
+	// OP ∈ {>、>=、<、<=、==、!=}），条件不满足则该步 Skipped=true 跳过。
+	When string `json:"when,omitempty"`
 }
 
 // DeadLetterConfig 死信处理配置。

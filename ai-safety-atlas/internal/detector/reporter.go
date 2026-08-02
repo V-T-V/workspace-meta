@@ -259,3 +259,61 @@ func htmlEscape(s string) string {
 	s = strings.ReplaceAll(s, "'", "&#39;")
 	return s
 }
+
+// statsSummary 是 StatsSummary 输出的 JSON 结构。
+//
+// 字段含义：
+//   - total / safe / flagged：输入总数 / 安全数 / 命中检测的数
+//   - avg_risk_score：所有输入的平均风险分（0-100，保留 2 位小数）
+//   - by_severity：每个严重度（INFO/LOW/MEDIUM/HIGH/CRITICAL）命中的检测条数。
+//     注意是"检测条数"而非"输入数"——一条输入可能命中多个不同严重度的检测。
+//   - by_type：每个攻击类型命中的检测条数。
+type statsSummary struct {
+	Total        int            `json:"total"`
+	Safe         int            `json:"safe"`
+	Flagged      int            `json:"flagged"`
+	AvgRiskScore float64        `json:"avg_risk_score"`
+	BySeverity   map[string]int `json:"by_severity"`
+	ByType       map[string]int `json:"by_type"`
+}
+
+// StatsSummary 返回批量检测的统计摘要（JSON 格式）。
+//
+// 统计内容：
+//   - total / safe / flagged：输入总数、安全（无检测）数、命中检测数。
+//   - avg_risk_score：所有输入 RiskScore 的算术平均（保留 2 位小数）。
+//   - by_severity：按检测 Severity 分布的命中条数（INFO/LOW/MEDIUM/HIGH/CRITICAL）。
+//   - by_type：按检测 AttackType 分布的命中条数。
+//
+// 空输入返回全 0 的摘要（total=0、各分布为空 map），仍是合法 JSON。
+// by_severity / by_type 只统计"实际命中的"严重度/类型，未出现的类别不出现在 map 中，
+// 避免输出大量 0 噪音（消费端按需查即可）。
+func StatsSummary(results []BatchResult) string {
+	s := statsSummary{
+		Total:      len(results),
+		BySeverity: map[string]int{},
+		ByType:     map[string]int{},
+	}
+	var scoreSum int
+	for _, r := range results {
+		scoreSum += r.RiskScore
+		if len(r.Detections) == 0 {
+			s.Safe++
+			continue
+		}
+		s.Flagged++
+		for _, d := range r.Detections {
+			s.BySeverity[d.Severity.String()]++
+			s.ByType[d.Type.String()]++
+		}
+	}
+	if s.Total > 0 {
+		// 保留 2 位小数：先乘 100 取整再除回，避免浮点尾差。
+		s.AvgRiskScore = float64(int(float64(scoreSum)*100/float64(s.Total))) / 100
+	}
+	b, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return fmt.Sprintf(`{"error": %q}`, err.Error())
+	}
+	return string(b)
+}

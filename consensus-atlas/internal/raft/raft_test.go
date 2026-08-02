@@ -566,3 +566,276 @@ func TestMemberChange(t *testing.T) {
 	}
 	t.Logf("新命令 cmd3 也已复制到 n6：LastIndex=%d", n6.Log.LastIndex())
 }
+
+// TestLogCompaction 验证日志压缩（snapshot 简化版）的核心语义：
+//
+//	单节点集群（Leader 自洽提交）流程：
+//	  1. Leader 提交 5 条命令（cmd1..cmd5），CommitIndex 推进到 5。
+//	  2. 调用 CompactLog(2)：保留最后 2 条（cmd4, cmd5），丢弃前 3 条。
+//	  3. 断言：物理 Length 从 5 降到 2，但逻辑 LastIndex 仍为 5、CommitIndex 仍为 5。
+//	  4. 断言：被压缩条目（cmd1）经 At 取不到，保留条目（cmd5）仍可取且 Index 不变。
+//	  5. 断言：压缩后仍能继续 Propose，新命令的 Index 接着 5 往后递增到 6。
+//	  6. 新 Follower 加入，Leader 用压缩后的日志把它从 BaseIndex+1 同步到最新。
+func TestLogCompaction(t *testing.T) {
+	tr := core.NewMemTransport()
+
+	// 单节点集群：超时即当选，自洽 quorum=1，便于确定性测试。
+	soloID := core.NodeID("leader")
+	leader := NewNode(soloID, []core.NodeID{soloID}, 3, tr)
+	leader.Start()
+	for i := 0; i < 3; i++ {
+		leader.Tick()
+	}
+	if leader.State != core.StateLeader {
+		t.Fatalf("单节点应当选 Leader，实际 %s", leader.State)
+	}
+
+	// 1. 提交 5 条命令。单节点 quorum=1，每次 Propose 立即广播后自洽 commit。
+	for i := 1; i <= 5; i++ {
+		if !leader.Propose("cmd" + itoa(i)) {
+			t.Fatalf("Propose cmd%d 失败", i)
+		}
+		// 推进一轮让 AppendEntriesResponse 回来触发 advanceCommit。
+		leader.Tick()
+		tr.Drain()
+	}
+	if leader.CommitIndex != 5 {
+		t.Fatalf("提交 5 条后 CommitIndex 应为 5，实际 %d", leader.CommitIndex)
+	}
+	if leader.Log.LastIndex() != 5 {
+		t.Fatalf("LastIndex 应为 5，实际 %d", leader.Log.LastIndex())
+	}
+	if leader.Log.Length() != 5 {
+		t.Fatalf("物理 Length 应为 5，实际 %d", leader.Log.Length())
+	}
+
+	// 2. 压缩：保留最后 2 条（cmd4, cmd5）。
+	dropped := leader.CompactLog(2)
+	if dropped != 3 {
+		t.Errorf("应丢弃 3 条（cmd1..cmd3），实际 %d", dropped)
+	}
+
+	// 3. 物理长度降低，但逻辑 LastIndex 与 CommitIndex 不变。
+	if got := leader.Log.Length(); got != 2 {
+		t.Errorf("压缩后 Length 应为 2，实际 %d", got)
+	}
+	if got := leader.Log.LastIndex(); got != 5 {
+		t.Errorf("压缩后 LastIndex 应仍为 5（逻辑空间不变），实际 %d", got)
+	}
+	if leader.CommitIndex != 5 {
+		t.Errorf("压缩不应改变 CommitIndex，应仍为 5，实际 %d", leader.CommitIndex)
+	}
+	if leader.LastApplied != 5 {
+		t.Errorf("压缩不应改变 LastApplied，应仍为 5，实际 %d", leader.LastApplied)
+	}
+	if base := leader.LogBaseIndex(); base != 3 {
+		t.Errorf("BaseIndex 应为 3（丢弃 3 条），实际 %d", base)
+	}
+
+	// 4. 被压缩条目取不到，保留条目仍可取且 Index 不变。
+	if _, ok := leader.Log.At(1); ok {
+		t.Error("cmd1 已被压缩，At(1) 应返回 false")
+	}
+	e4, ok := leader.Log.At(4)
+	if !ok || e4.Command != "cmd4" || e4.Index != 4 {
+		t.Errorf("At(4) 应返回 cmd4/Index=4，实际 ok=%v %+v", ok, e4)
+	}
+	e5, ok := leader.Log.At(5)
+	if !ok || e5.Command != "cmd5" || e5.Index != 5 {
+		t.Errorf("At(5) 应返回 cmd5/Index=5，实际 ok=%v %+v", ok, e5)
+	}
+
+	// 5. 压缩后仍能继续 Propose，Index 从 6 继续。
+	if !leader.Propose("cmd6") {
+		t.Fatal("压缩后 Propose cmd6 应成功")
+	}
+	leader.Tick()
+	tr.Drain()
+	if leader.Log.LastIndex() != 6 {
+		t.Errorf("cmd6 后 LastIndex 应为 6，实际 %d", leader.Log.LastIndex())
+	}
+	e6, ok := leader.Log.At(6)
+	if !ok || e6.Command != "cmd6" {
+		t.Errorf("At(6) 应返回 cmd6，实际 ok=%v %+v", ok, e6)
+	}
+	if leader.CommitIndex != 6 {
+		t.Errorf("cmd6 应被提交，CommitIndex 应为 6，实际 %d", leader.CommitIndex)
+	}
+
+	// 6. 新 Follower 加入，Leader 用压缩后的日志把它同步到最新。
+	//    Leader 当前：BaseIndex=3，Entries = [cmd4@4, cmd5@5, cmd6@6]，LastIndex=6。
+	//
+	//    简化说明：真实 Raft 此时若新 Follower 落后到已压缩区间，Leader 会发
+	//    InstallSnapshot 把 snapshot 状态整体下发。本教学实现未实现 InstallSnapshot，
+	//    故这里让新 Follower 预置已被压缩进 snapshot 的等价状态（cmd1..cmd3 的副本，
+	//    逻辑 Index 1..3），模拟"它已通过其它途径获得了 snapshot 状态"。这样 Leader
+	//    的 AppendEntries（PrevLogIndex=3）能与 Follower 的日志匹配，进而同步 cmd4..cmd6。
+	const followerID core.NodeID = "follower"
+	follower := NewNode(followerID, []core.NodeID{soloID, followerID}, 10_000, tr)
+	follower.Start()
+	for i := 1; i <= 3; i++ { // 预置 snapshot 等价状态（cmd1..cmd3）
+		follower.Log.Append(leader.CurrentTerm, "cmd"+itoa(i))
+	}
+	if follower.Log.LastIndex() != 3 {
+		t.Fatalf("预置后 Follower LastIndex 应为 3，实际 %d", follower.Log.LastIndex())
+	}
+
+	// 把 follower 加入 Leader 的成员视图：扩 Peers，nextIndex=BaseIndex+1=4
+	// （从压缩后的起点开始补发，跳过已 snapshot 的 cmd1..cmd3）。
+	leader.Peers = append(leader.Peers, followerID)
+	leader.nextIndex[followerID] = leader.Log.BaseIndex + 1 // 4
+	leader.matchIndex[followerID] = 0
+
+	// 推进若干轮，让 Leader 的 AppendEntries 把 cmd4..cmd6 补发给 follower。
+	synced := false
+	for i := 0; i < 40 && !synced; i++ {
+		leader.Tick()
+		follower.Tick()
+		tr.Drain()
+		if follower.Log.LastIndex() == leader.Log.LastIndex() &&
+			leader.matchIndex[followerID] == leader.Log.LastIndex() {
+			synced = true
+		}
+	}
+	if follower.Log.LastIndex() != 6 {
+		t.Errorf("新 Follower 应被同步到 LastIndex=6，实际 %d", follower.Log.LastIndex())
+	}
+	// follower 应有完整的 cmd1..cmd6（前 3 条是预置的 snapshot 等价状态，cmd4..cmd6 是补发的）。
+	for _, idx := range []uint64{1, 2, 3, 4, 5, 6} {
+		fe, ok := follower.Log.At(idx)
+		wantCmd := "cmd" + itoa(int(idx))
+		if !ok || fe.Command != wantCmd {
+			t.Errorf("Follower At(%d) 应为 %s，实际 ok=%v %+v", idx, wantCmd, ok, fe)
+		}
+	}
+	// cmd4..cmd6 的 Term 必须与 Leader 完全一致（这些是通过 AppendEntries 复制的）。
+	for _, idx := range []uint64{4, 5, 6} {
+		fe, _ := follower.Log.At(idx)
+		le, _ := leader.Log.At(idx)
+		if fe.Term != le.Term {
+			t.Errorf("Follower At(%d) Term=%d 与 Leader Term=%d 不一致", idx, fe.Term, le.Term)
+		}
+	}
+	// follower 的 CommitIndex 应被 Leader 的 LeaderCommit 拉齐到 6。
+	if follower.CommitIndex != 6 {
+		t.Errorf("新 Follower CommitIndex 应被拉齐到 6，实际 %d", follower.CommitIndex)
+	}
+	if !synced {
+		t.Error("40 轮 tick+drain 后新 Follower 仍未同步到压缩后的 Leader 日志")
+	}
+	t.Logf("压缩后新 Follower 同步完成：follower LastIndex=%d CommitIndex=%d",
+		follower.Log.LastIndex(), follower.CommitIndex)
+}
+
+// TestCompactLogEdgeCases 验证 CompactLog 的边界行为。
+func TestCompactLogEdgeCases(t *testing.T) {
+	tr := core.NewMemTransport()
+	n := NewNode("solo", []core.NodeID{"solo"}, 3, tr)
+	n.Start()
+	for i := 0; i < 3; i++ {
+		n.Tick()
+	}
+	for i := 1; i <= 4; i++ {
+		n.Propose("c" + itoa(i))
+		n.Tick()
+		tr.Drain()
+	}
+	// 4 条命令，LastIndex=4。
+
+	// keepLast >= len：无操作，应丢弃 0。
+	if d := n.CompactLog(10); d != 0 {
+		t.Errorf("keepLast(10) >= len(4) 应丢弃 0，实际 %d", d)
+	}
+	if n.Log.Length() != 4 || n.Log.LastIndex() != 4 {
+		t.Errorf("无操作压缩后 Length/LastIndex 应仍为 4/4")
+	}
+
+	// keepLast=0：丢弃全部，BaseIndex += len，物理清空，逻辑 LastIndex 不变。
+	if d := n.CompactLog(0); d != 4 {
+		t.Errorf("keepLast(0) 应丢弃全部 4 条，实际 %d", d)
+	}
+	if n.Log.Length() != 0 {
+		t.Errorf("keepLast(0) 后 Length 应为 0，实际 %d", n.Log.Length())
+	}
+	if n.Log.LastIndex() != 4 {
+		t.Errorf("keepLast(0) 后 LastIndex 应仍为 4（逻辑不变），实际 %d", n.Log.LastIndex())
+	}
+	if n.LogBaseIndex() != 4 {
+		t.Errorf("keepLast(0) 后 BaseIndex 应为 4，实际 %d", n.LogBaseIndex())
+	}
+	if n.CommitIndex != 4 {
+		t.Errorf("压缩不应改变 CommitIndex，应仍为 4，实际 %d", n.CommitIndex)
+	}
+
+	// 全部压缩后仍可继续 Propose，Index 从 5 继续。
+	n.Propose("c5")
+	if n.Log.LastIndex() != 5 {
+		t.Errorf("全压缩后再 Propose，LastIndex 应为 5，实际 %d", n.Log.LastIndex())
+	}
+	e5, ok := n.Log.At(5)
+	if !ok || e5.Command != "c5" || e5.Index != 5 {
+		t.Errorf("At(5) 应为 c5/Index=5，实际 ok=%v %+v", ok, e5)
+	}
+}
+
+// TestCompactLogLeaderNextIndexLifted 验证压缩会把 Leader 对各 Follower
+// 落在已压缩区间的 nextIndex 抬到 BaseIndex+1，避免后续广播误判 PrevLogTerm。
+func TestCompactLogLeaderNextIndexLifted(t *testing.T) {
+	tr := core.NewMemTransport()
+	ids := []core.NodeID{"n1", "n2"}
+	n1 := NewNode("n1", ids, 3, tr)
+	n2 := NewNode("n2", ids, 10_000, tr)
+	n1.Start()
+	n2.Start()
+	// 选举：n1 超时最小，先觉醒请求投票；tick + drain 让 RequestVote 往返完成。
+	for i := 0; i < 10; i++ {
+		n1.Tick()
+		n2.Tick()
+		tr.Drain()
+	}
+	if n1.State != core.StateLeader {
+		t.Fatalf("n1 应当选 Leader，实际 %s", n1.State)
+	}
+	for i := 1; i <= 4; i++ {
+		n1.Propose("c" + itoa(i))
+		n1.Tick()
+		n2.Tick()
+		tr.Drain()
+	}
+	// 此时 n2 也应已同步到 LastIndex=4。
+	if n2.Log.LastIndex() != 4 {
+		t.Fatalf("n2 应已同步到 4，实际 %d", n2.Log.LastIndex())
+	}
+
+	// 把 Leader 对 n2 的 nextIndex 人为压低到 2（模拟回退中），然后压缩到 keepLast=1。
+	// 压缩后 BaseIndex=3，nextIndex=2 落在已压缩区间，应被抬到 BaseIndex+1=4。
+	n1.nextIndex["n2"] = 2
+	n1.CompactLog(1) // 保留 c4，丢弃 c1..c3，BaseIndex=3
+	if got := n1.nextIndex["n2"]; got != 4 {
+		t.Errorf("压缩后 nextIndex[n2] 应被抬到 BaseIndex+1=4，实际 %d", got)
+	}
+}
+
+// itoa 是测试内用的 uint64→string 轻量实现（避免在测试文件 import strconv）。
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var buf [20]byte
+	i := len(buf)
+	neg := false
+	if n < 0 {
+		neg = true
+		n = -n
+	}
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
+}

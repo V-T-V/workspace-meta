@@ -178,7 +178,56 @@ func (n *Node) Propose(command any) bool {
 	}
 	n.Log.Append(n.CurrentTerm, command)
 	n.broadcastAppendEntries()
+	// 单节点集群（或刚追上 quorum 的 Leader）自洽提交：Append 后立即尝试推进 commit。
+	// 多节点场景下 advanceCommit 因 matchIndex 未达 quorum 不会提前提交，行为不变；
+	// 单节点场景下 quorum=1，Leader 自身 count=1 即达 quorum，故能立即提交本任期条目。
+	n.advanceCommit()
 	return true
+}
+
+// CompactLog 执行日志压缩（snapshot 的简化版）：保留最后 keepLast 条日志，
+// 丢弃更早的条目（它们已被"提交并应用到状态机"，可安全从内存日志移除）。
+//
+// 这是 Raft 快照/日志压缩的核心思想（论文 §7）：日志无限增长会耗尽存储并拖慢
+// 重启回放；定期把已应用的状态打成 snapshot，然后裁剪日志前缀。本教学实现
+// 只做"裁剪前缀"这一步（不真的序列化状态机状态），用 BaseIndex 偏移保留逻辑
+// Index 空间的连续性，使 raft.go 的所有 Index 一致性检查自动保持正确。
+//
+// 关键不变量（本方法必须保证，且 TestLogCompaction 会校验）：
+//   - Log.LastIndex() 不变（被压缩的条目仍计入 BaseIndex）。
+//   - CommitIndex / LastApplied 不变（已提交的进度不能因压缩丢失）。
+//   - Log.Length()（物理条目数）减少到 keepLast。
+//   - 压缩后仍能给新加入的 Follower 同步：Leader 对该 Follower 的 nextIndex
+//     若落在已压缩区间（<= BaseIndex），后续广播会以 BaseIndex 为 PrevLogIndex
+//     重置（真实 Raft 这里改用 InstallSnapshot；本简化版用"从 BaseIndex+1 重发"）。
+//
+// 返回实际被丢弃的条目数。
+func (n *Node) CompactLog(keepLast int) int {
+	dropped := n.Log.Compact(keepLast)
+	// Leader 还需修正对各 Follower 的 nextIndex/matchIndex：
+	//   - nextIndex 不能落在已被丢弃的区间（<= BaseIndex），否则 broadcastAppendEntries
+	//     计算 PrevLogIndex=nextIndex-1 时会取到已不存在的条目（At 返回 false），
+	//     导致 PrevLogTerm=0 误判匹配。把过低的 nextIndex 抬到 BaseIndex+1。
+	//   - matchIndex 若高于 BaseIndex 则保持（该 Follower 已有部分未压缩条目），
+	//     不做下调（matchIndex 反映"已知对方拥有的最高 Index"，与是否压缩无关）。
+	base := n.Log.BaseIndex
+	if n.State == core.StateLeader {
+		for _, peer := range n.Peers {
+			if peer == n.ID {
+				continue
+			}
+			if ni := n.nextIndex[peer]; ni <= base {
+				n.nextIndex[peer] = base + 1
+			}
+		}
+	}
+	return dropped
+}
+
+// LogBaseIndex 返回日志的 BaseIndex（已被压缩/丢弃的条目数）。
+// 暴露给测试与运维观察用：LogBaseIndex()>0 表示该节点已做过压缩。
+func (n *Node) LogBaseIndex() uint64 {
+	return n.Log.BaseIndex
 }
 
 // broadcastAppendEntries 向所有 Follower 发送 AppendEntries（含日志或心跳）。
@@ -189,12 +238,10 @@ func (n *Node) broadcastAppendEntries() {
 		}
 		ni := n.nextIndex[peer]
 		prevIndex := ni - 1
-		var prevTerm uint64
-		if prevIndex > 0 {
-			if e, ok := n.Log.At(prevIndex); ok {
-				prevTerm = e.Term
-			}
-		}
+		// 用 TermAt 而非 At().Term：当 prevIndex 恰好落在压缩边界（== BaseIndex）时，
+		// At 会返回 false（条目已被压缩），但 TermAt 仍能给出压缩时记录的 BaseTerm，
+		// 使 Leader 能向"已恢复 snapshot 等价状态"的 Follower 续传保留段日志。
+		prevTerm := n.Log.TermAt(prevIndex)
 		var entries []core.LogEntry
 		if last := n.Log.LastIndex(); ni <= last {
 			entries = n.Log.Slice(ni, last)
@@ -390,12 +437,8 @@ func (n *Node) handleAppendEntriesResponse(msg core.Message) {
 func (n *Node) sendAppendTo(peer core.NodeID) {
 	ni := n.nextIndex[peer]
 	prevIndex := ni - 1
-	var prevTerm uint64
-	if prevIndex > 0 {
-		if e, ok := n.Log.At(prevIndex); ok {
-			prevTerm = e.Term
-		}
-	}
+	// 同 broadcastAppendEntries：用 TermAt 兼容压缩边界。
+	prevTerm := n.Log.TermAt(prevIndex)
 	var entries []core.LogEntry
 	if last := n.Log.LastIndex(); ni <= last {
 		entries = n.Log.Slice(ni, last)

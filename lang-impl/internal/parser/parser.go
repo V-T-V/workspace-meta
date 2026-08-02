@@ -655,8 +655,50 @@ func (p *Parser) parsePrimary() (core.Expr, error) {
 			return nil, err
 		}
 		return p.parsePostfixIndex(&core.ArrayExpr{Loc: tok.Loc, Elements: elems})
+	case core.TokFn:
+		// 匿名函数表达式（一等函数）：fn(params) { body }
+		// 注意：fn 作为语句开头时走 parseFn（命名函数声明 fn name(){}）；
+		// 走到 parsePrimary 的 fn 一定是表达式上下文里的匿名函数。
+		fn, err := p.parseFnExpr()
+		if err != nil {
+			return nil, err
+		}
+		return p.parsePostfixIndex(fn)
 	}
 	return nil, core.NewError(tok.Loc, "意外的 token %s（期望表达式）", describeToken(tok))
+}
+
+// parseFnExpr 解析匿名函数表达式：fn "(" params? ")" block。
+// 与 parseFn（命名函数声明）共用参数列表/块解析逻辑，但不消费函数名，
+// 也不要求尾分号（表达式本身不带分号，由外层 parseLet/parseExprStmt 处理）。
+//
+// 例子：fn(x) { return x + 1; }
+func (p *Parser) parseFnExpr() (*core.FnExpr, error) {
+	kw := p.advance() // fn
+	if _, err := p.expect(core.TokLParen); err != nil {
+		return nil, err
+	}
+	var params []string
+	if !p.check(core.TokRParen) {
+		for {
+			pt, err := p.expect(core.TokIdent)
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, pt.Value)
+			if !p.match(core.TokComma) {
+				break
+			}
+		}
+	}
+	if _, err := p.expect(core.TokRParen); err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &core.FnExpr{Loc: kw.Loc, Params: params, Body: body}, nil
 }
 
 // parsePostfixIndex 处理数组索引后缀 expr[index]（可链式：arr[0][1]）。
@@ -804,6 +846,11 @@ func printNode(sb *strings.Builder, n any, indent int) {
 		for _, a := range e.Args {
 			printNode(sb, a, indent+1)
 		}
+	case *core.FnExpr:
+		sb.WriteString("FnExpr(")
+		sb.WriteString(strings.Join(e.Params, ", "))
+		sb.WriteString(")\n")
+		printNode(sb, e.Body, indent+1)
 	default:
 		sb.WriteString("(unknown node)\n")
 	}

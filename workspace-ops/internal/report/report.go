@@ -194,6 +194,90 @@ func (MarkdownReporter) Format(r Report) string {
 
 // ===== 辅助 =====
 
+// GroupByStack 按技术栈分组项目，返回 map[stack][]ProjectView。
+//
+// 分组键用 StackPrimary；空栈归入 "unknown"（与 Build 里 StackSummary 的口径一致，
+// 保证二者可对照）。同一栈内的项目保持它们在输入里的相对顺序。
+//
+// 适合做"每种技术栈有几个项目、各是什么"的二次聚合分析。
+func GroupByStack(projects []ProjectView) map[string][]ProjectView {
+	groups := make(map[string][]ProjectView)
+	for _, p := range projects {
+		stack := p.StackPrimary
+		if stack == "" {
+			stack = "unknown"
+		}
+		groups[stack] = append(groups[stack], p)
+	}
+	return groups
+}
+
+// FormatGroupReport 输出按栈分组的报告：每个栈一段，含项目数与健康平均分。
+//
+// 输出形如：
+//
+//	工作区分组报告（共 N 个项目，M 个栈）
+//
+//	## go（3 个项目，平均健康 80）
+//	  - proj-a  [health=90]
+//	  - proj-c  [health=70]
+//	  - proj-d  [health=80]
+//
+//	## node/ts（1 个项目，平均健康 50）
+//	  - proj-b  [health=50]
+//
+// 栈按字母序输出（确定性，便于断言）；栈内项目按 Report.Projects 的原始顺序。
+// 健康平均分对整数做四舍五入；空 Report 返回占位说明。
+func FormatGroupReport(r Report) string {
+	groups := GroupByStack(r.Projects)
+	// 收集并排序栈名，保证输出确定性。
+	stacks := make([]string, 0, len(groups))
+	for s := range groups {
+		stacks = append(stacks, s)
+	}
+	sortStrings(stacks)
+
+	var b strings.Builder
+	if r.ProjectCount == 0 || len(r.Projects) == 0 {
+		fmt.Fprintf(&b, "工作区分组报告（无项目）\n")
+		return b.String()
+	}
+	fmt.Fprintf(&b, "工作区分组报告（共 %d 个项目，%d 个栈）\n\n", r.ProjectCount, len(stacks))
+	for _, s := range stacks {
+		projs := groups[s]
+		avg := averageHealth(projs)
+		fmt.Fprintf(&b, "## %s（%d 个项目，平均健康 %d）\n", s, len(projs), avg)
+		for _, p := range projs {
+			fmt.Fprintf(&b, "  - %s  [health=%d]\n", p.Slug, p.HealthScore)
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// averageHealth 计算一组项目的健康平均分（四舍五入到整数）。
+// 空切片返回 0，避免除零。
+func averageHealth(projs []ProjectView) int {
+	if len(projs) == 0 {
+		return 0
+	}
+	sum := 0
+	for _, p := range projs {
+		sum += p.HealthScore
+	}
+	return (sum + len(projs)/2) / len(projs) // 四舍五入
+}
+
+// sortStrings 对字符串切片原地升序排序（纯标准库，避免为单点用途引入 sort 包到上层）。
+// 用插入排序：项目栈数量很小（几十以内），插入排序简洁且无额外分配。
+func sortStrings(a []string) {
+	for i := 1; i < len(a); i++ {
+		for j := i; j > 0 && a[j-1] > a[j]; j-- {
+			a[j-1], a[j] = a[j], a[j-1]
+		}
+	}
+}
+
 func pad(s string, width int) string {
 	// 中文宽度近似处理：一个中文字符算 2 列
 	w := displayWidth(s)

@@ -112,6 +112,21 @@ type IndexExpr struct {
 func (IndexExpr) exprNode()            {}
 func (e IndexExpr) NodeLoc() SourceLoc { return e.Loc }
 
+// FnExpr 匿名函数表达式（一等函数 / function value）：fn(params) { body }。
+// 与 FnDecl 的区别：没有名字，是表达式而非语句，可出现在任意表达式位置
+// （let 绑定、函数参数、数组元素、return 值等）。
+//
+// 例子：let f = fn(x) { return x + 1; };
+// 求值时产生一个 function value，捕获定义时的环境作为闭包。
+type FnExpr struct {
+	Loc    SourceLoc
+	Params []string
+	Body   *BlockStmt
+}
+
+func (FnExpr) exprNode()            {}
+func (e FnExpr) NodeLoc() SourceLoc { return e.Loc }
+
 // ===== 语句节点 =====
 
 // LetStmt 变量绑定：let name = expr;

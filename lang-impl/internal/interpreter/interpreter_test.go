@@ -827,3 +827,88 @@ return sum(4);` // 0+1+2+3 = 6
 		t.Errorf("函数内 break 后 return 应为 6，实际 %d", got)
 	}
 }
+
+// ===== 一等函数（函数值） =====
+
+func TestFirstClassFunction(t *testing.T) {
+	// 基本用例：匿名函数赋值给变量，再通过变量名调用。
+	src := `let double = fn(x) { return x * 2; };
+return double(21);`
+	if got := runInt(t, src); got != 42 {
+		t.Errorf("double(21) 应为 42，实际 %d", got)
+	}
+}
+
+func TestFirstClassFunctionIncrement(t *testing.T) {
+	// 题目给的另一示例变体：x + 1。
+	src := `let inc = fn(x) { return x + 1; };
+return inc(41);`
+	if got := runInt(t, src); got != 42 {
+		t.Errorf("inc(41) 应为 42，实际 %d", got)
+	}
+}
+
+func TestFirstClassFunctionClosure(t *testing.T) {
+	// 闭包：匿名函数捕获外层 let 绑定的变量。
+	// makeAdder(n) 返回 fn(x){ return x + n; }，n 是定义时捕获的值。
+	src := `fn makeAdder(n) {
+  return fn(x) { return x + n; };
+}
+let add10 = makeAdder(10);
+let add20 = makeAdder(20);
+return add10(5) + add20(5);` // 15 + 25 = 40
+	if got := runInt(t, src); got != 40 {
+		t.Errorf("闭包 add10(5)+add20(5) 应为 40，实际 %d", got)
+	}
+}
+
+func TestFirstClassFunctionPassedAsArg(t *testing.T) {
+	// 一等函数作为参数传递：apply(f, x) 调用传入的函数值。
+	src := `fn apply(f, x) {
+  return f(x);
+}
+let square = fn(n) { return n * n; };
+return apply(square, 6);` // 36
+	if got := runInt(t, src); got != 36 {
+		t.Errorf("apply(square, 6) 应为 36，实际 %d", got)
+	}
+}
+
+func TestFirstClassFunctionNoParams(t *testing.T) {
+	// 无参匿名函数。
+	src := `let fortytwo = fn() { return 42; };
+return fortytwo();`
+	if got := runInt(t, src); got != 42 {
+		t.Errorf("无参函数调用应为 42，实际 %d", got)
+	}
+}
+
+func TestFirstClassFunctionMultiParams(t *testing.T) {
+	// 多参数匿名函数。
+	src := `let add = fn(a, b) { return a + b; };
+return add(15, 27);`
+	if got := runInt(t, src); got != 42 {
+		t.Errorf("add(15,27) 应为 42，实际 %d", got)
+	}
+}
+
+func TestFirstClassFunctionArgCountError(t *testing.T) {
+	// 一等函数参数数量不匹配应报错（而非静默通过）。
+	src := `let f = fn(x) { return x; };
+return f(1, 2);`
+	_, err := run(t, src)
+	if err == nil {
+		t.Error("参数数量不匹配应返回错误")
+	}
+}
+
+func TestFirstClassFunctionOverridesNamed(t *testing.T) {
+	// 同名时，函数表里的命名函数与变量环境里的 function value 各自独立：
+	// let f = ... 绑定到变量环境，调用 f() 时优先用变量环境里的 function value。
+	src := `fn f() { return 1; }
+let g = fn() { return 99; };
+return g();`
+	if got := runInt(t, src); got != 99 {
+		t.Errorf("g() 应为 99，实际 %d", got)
+	}
+}

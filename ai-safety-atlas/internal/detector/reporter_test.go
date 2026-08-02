@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/QiuShichang/ai-safety-atlas/internal/types"
 )
 
 func TestBatchAnalyze(t *testing.T) {
@@ -287,5 +289,117 @@ func TestHTMLReportEmpty(t *testing.T) {
 	}
 	if strings.Contains(body, "<tr>") {
 		t.Errorf("空报告 tbody 不应有数据行\n输出:\n%s", body)
+	}
+}
+
+// TestStatsSummary 验证统计摘要的 total/safe/flagged/by_severity/by_type/avg_risk_score。
+// 用手工构造的 BatchResult（而非 BatchAnalyze）以精确控制分布，断言更稳定。
+func TestStatsSummary(t *testing.T) {
+	results := []BatchResult{
+		// 0: 安全（无检测）
+		{Input: "hi", Detections: nil, RiskScore: 0, RiskLevel: "SAFE"},
+		// 1: 1 个 HIGH 注入
+		{Input: "ignore previous", Detections: []types.Detection{
+			{Type: types.AttackPromptInjection, Severity: types.SeverityHigh, Rule: "r1"},
+		}, RiskScore: 80, RiskLevel: "HIGH"},
+		// 2: 2 个检测（CRITICAL DAN + MEDIUM PII）
+		{Input: "DAN", Detections: []types.Detection{
+			{Type: types.AttackDan, Severity: types.SeverityCritical, Rule: "r2"},
+			{Type: types.AttackPIILeak, Severity: types.SeverityMedium, Rule: "r3"},
+		}, RiskScore: 100, RiskLevel: "CRITICAL"},
+	}
+
+	out := StatsSummary(results)
+	var s struct {
+		Total        int            `json:"total"`
+		Safe         int            `json:"safe"`
+		Flagged      int            `json:"flagged"`
+		AvgRiskScore float64        `json:"avg_risk_score"`
+		BySeverity   map[string]int `json:"by_severity"`
+		ByType       map[string]int `json:"by_type"`
+	}
+	if err := json.Unmarshal([]byte(out), &s); err != nil {
+		t.Fatalf("StatsSummary 输出不是合法 JSON: %v\n输出: %s", err, out)
+	}
+
+	if s.Total != 3 {
+		t.Errorf("total 应为 3, 实际 %d", s.Total)
+	}
+	if s.Safe != 1 {
+		t.Errorf("safe 应为 1, 实际 %d", s.Safe)
+	}
+	if s.Flagged != 2 {
+		t.Errorf("flagged 应为 2, 实际 %d", s.Flagged)
+	}
+	// avg = (0 + 80 + 100) / 3 = 60
+	if s.AvgRiskScore != 60 {
+		t.Errorf("avg_risk_score 应为 60, 实际 %f", s.AvgRiskScore)
+	}
+
+	// by_severity: HIGH=1, CRITICAL=1, MEDIUM=1
+	if s.BySeverity["HIGH"] != 1 {
+		t.Errorf("by_severity[HIGH] 应为 1, 实际 %d", s.BySeverity["HIGH"])
+	}
+	if s.BySeverity["CRITICAL"] != 1 {
+		t.Errorf("by_severity[CRITICAL] 应为 1, 实际 %d", s.BySeverity["CRITICAL"])
+	}
+	if s.BySeverity["MEDIUM"] != 1 {
+		t.Errorf("by_severity[MEDIUM] 应为 1, 实际 %d", s.BySeverity["MEDIUM"])
+	}
+	// 未出现的严重度不应出现在 map 里（不输出 0 噪音）
+	if _, ok := s.BySeverity["INFO"]; ok {
+		t.Errorf("by_severity 不应含未命中的 INFO")
+	}
+
+	// by_type: PROMPT_INJECTION=1, DAN=1, PII_LEAK=1
+	if s.ByType["PROMPT_INJECTION"] != 1 {
+		t.Errorf("by_type[PROMPT_INJECTION] 应为 1, 实际 %d", s.ByType["PROMPT_INJECTION"])
+	}
+	if s.ByType["DAN"] != 1 {
+		t.Errorf("by_type[DAN] 应为 1, 实际 %d", s.ByType["DAN"])
+	}
+	if s.ByType["PII_LEAK"] != 1 {
+		t.Errorf("by_type[PII_LEAK] 应为 1, 实际 %d", s.ByType["PII_LEAK"])
+	}
+}
+
+// TestStatsSummaryEmpty 空输入返回全 0 的合法 JSON 摘要。
+func TestStatsSummaryEmpty(t *testing.T) {
+	out := StatsSummary(nil)
+	var s statsSummary
+	if err := json.Unmarshal([]byte(out), &s); err != nil {
+		t.Fatalf("空输入的 StatsSummary 应为合法 JSON: %v\n输出: %s", err, out)
+	}
+	if s.Total != 0 || s.Safe != 0 || s.Flagged != 0 {
+		t.Errorf("空输入计数应全 0, got total=%d safe=%d flagged=%d", s.Total, s.Safe, s.Flagged)
+	}
+	if s.AvgRiskScore != 0 {
+		t.Errorf("空输入 avg_risk_score 应为 0, 实际 %f", s.AvgRiskScore)
+	}
+	// by_severity / by_type 应是空 map（非 null），避免消费端空指针
+	if s.BySeverity == nil {
+		t.Error("空输入 by_severity 应为空 map 而非 null")
+	}
+	if s.ByType == nil {
+		t.Error("空输入 by_type 应为空 map 而非 null")
+	}
+}
+
+// TestStatsSummaryAllSafe 全部安全时 flagged=0、分布为空 map。
+func TestStatsSummaryAllSafe(t *testing.T) {
+	results := []BatchResult{
+		{Input: "a", Detections: nil, RiskScore: 0, RiskLevel: "SAFE"},
+		{Input: "b", Detections: nil, RiskScore: 0, RiskLevel: "SAFE"},
+	}
+	out := StatsSummary(results)
+	var s statsSummary
+	if err := json.Unmarshal([]byte(out), &s); err != nil {
+		t.Fatalf("合法 JSON 解析失败: %v", err)
+	}
+	if s.Total != 2 || s.Safe != 2 || s.Flagged != 0 {
+		t.Errorf("全安全应 2/2/0, got %d/%d/%d", s.Total, s.Safe, s.Flagged)
+	}
+	if len(s.BySeverity) != 0 || len(s.ByType) != 0 {
+		t.Errorf("全安全时分布应为空, got by_severity=%v by_type=%v", s.BySeverity, s.ByType)
 	}
 }

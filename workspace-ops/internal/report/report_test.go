@@ -158,3 +158,204 @@ func TestHealthScoreInMarkdownReport(t *testing.T) {
 		t.Errorf("proj-b 行应含 health=50\n实际:\n%s", out)
 	}
 }
+
+// ===== 分组报告 =====
+
+// groupedFacts 构造多栈、多项目的 Facts，用于分组报告测试。
+// go 栈 3 个，node/ts 栈 1 个，rust 栈 1 个，空栈 1 个（应归入 unknown）。
+func groupedFacts() []inspector.Facts {
+	return []inspector.Facts{
+		{Slug: "go-1", Path: "/g/1", KV: map[string]string{
+			"stack_primary": "go", "has_agents_md": "true", "git_dirty": "false", "test_count": "10",
+		}}, // health: 20+30+20+20 = 90
+		{Slug: "node-1", Path: "/n/1", KV: map[string]string{
+			"stack_primary": "node/ts", "has_agents_md": "false", "git_dirty": "true", "test_count": "5",
+		}}, // health: 30+20 = 50
+		{Slug: "go-2", Path: "/g/2", KV: map[string]string{
+			"stack_primary": "go", "has_agents_md": "true", "git_dirty": "false", "test_count": "0",
+		}}, // health: 20+20+20 = 60
+		{Slug: "rust-1", Path: "/r/1", KV: map[string]string{
+			"stack_primary": "rust", "has_agents_md": "true", "git_dirty": "false", "test_count": "20",
+		}}, // health: 20+30+20+20 = 90
+		{Slug: "mystery", Path: "/m", KV: map[string]string{
+			"git_dirty": "true", "test_count": "0",
+		}}, // 空 stack → unknown；health: 0
+		{Slug: "go-3", Path: "/g/3", KV: map[string]string{
+			"stack_primary": "go", "has_agents_md": "false", "git_dirty": "false", "test_count": "8",
+		}}, // health: 30+20+20 = 70
+	}
+}
+
+// TestGroupByStack 验证按 StackPrimary 分组的正确性，含空栈归 unknown。
+func TestGroupByStack(t *testing.T) {
+	r := Build(groupedFacts())
+	groups := GroupByStack(r.Projects)
+
+	if got := len(groups["go"]); got != 3 {
+		t.Errorf("go 栈应有 3 个项目，实际 %d", got)
+	}
+	if got := len(groups["node/ts"]); got != 1 {
+		t.Errorf("node/ts 栈应有 1 个项目，实际 %d", got)
+	}
+	if got := len(groups["rust"]); got != 1 {
+		t.Errorf("rust 栈应有 1 个项目，实际 %d", got)
+	}
+	if got := len(groups["unknown"]); got != 1 {
+		t.Errorf("空栈应归入 unknown（1 个），实际 %d", got)
+	}
+	// 总数守恒。
+	total := 0
+	for _, ps := range groups {
+		total += len(ps)
+	}
+	if total != len(r.Projects) {
+		t.Errorf("分组后项目总数 %d 应等于原项目数 %d", total, len(r.Projects))
+	}
+	// 分组内保持原顺序：go 组应是 go-1, go-2, go-3。
+	goSlugs := make([]string, 0, len(groups["go"]))
+	for _, p := range groups["go"] {
+		goSlugs = append(goSlugs, p.Slug)
+	}
+	wantGo := []string{"go-1", "go-2", "go-3"}
+	if len(goSlugs) != len(wantGo) {
+		t.Fatalf("go 组顺序长度错: %v", goSlugs)
+	}
+	for i := range wantGo {
+		if goSlugs[i] != wantGo[i] {
+			t.Errorf("go 组顺序错：位置 %d 应 %s 实 %s（整组 %v）", i, wantGo[i], goSlugs[i], goSlugs)
+		}
+	}
+}
+
+// TestGroupByStackEmpty 验证空输入返回非 nil 的空 map。
+func TestGroupByStackEmpty(t *testing.T) {
+	groups := GroupByStack(nil)
+	if groups == nil {
+		t.Fatal("GroupByStack(nil) 不应返回 nil map")
+	}
+	if len(groups) != 0 {
+		t.Errorf("空输入应得到空 map，实际 %v", groups)
+	}
+}
+
+// TestGroupByStackExplicitUnknown 验证 StackPrimary 显式为 "unknown" 与空栈归同一组。
+func TestGroupByStackExplicitUnknown(t *testing.T) {
+	projs := []ProjectView{
+		{Slug: "a", StackPrimary: ""},
+		{Slug: "b", StackPrimary: "unknown"},
+	}
+	groups := GroupByStack(projs)
+	if got := len(groups["unknown"]); got != 2 {
+		t.Errorf("空栈与显式 unknown 应合并到同一组（2 个），实际 %d", got)
+	}
+}
+
+// TestFormatGroupReport 验证分组报告含各栈段、项目数、健康平均分。
+func TestFormatGroupReport(t *testing.T) {
+	r := Build(groupedFacts())
+	out := FormatGroupReport(r)
+
+	// 头部含总数与栈数。
+	if !strings.Contains(out, "共 6 个项目") {
+		t.Errorf("报告头部应含项目总数 6\n实际:\n%s", out)
+	}
+	if !strings.Contains(out, "4 个栈") {
+		t.Errorf("报告头部应含栈数 4（go/node/ts/rust/unknown）\n实际:\n%s", out)
+	}
+	// 每个栈段都应出现。
+	for _, stack := range []string{"go", "node/ts", "rust", "unknown"} {
+		if !strings.Contains(out, "## "+stack) {
+			t.Errorf("报告应含栈段 %q\n实际:\n%s", stack, out)
+		}
+	}
+	// go 段：3 个项目，平均健康 = (90+60+70+四舍五入)/3 = 220/3 = 73.3 → 73。
+	if !strings.Contains(out, "## go（3 个项目，平均健康 73）") {
+		t.Errorf("go 段应显示 3 个项目、平均健康 73\n实际:\n%s", out)
+	}
+	// 每个项目都列出。
+	for _, slug := range []string{"go-1", "go-2", "go-3", "node-1", "rust-1", "mystery"} {
+		if !strings.Contains(out, slug) {
+			t.Errorf("报告应列出项目 %q\n实际:\n%s", slug, out)
+		}
+	}
+}
+
+// TestFormatGroupReportEmpty 验证空报告的占位输出。
+func TestFormatGroupReportEmpty(t *testing.T) {
+	out := FormatGroupReport(Report{})
+	if !strings.Contains(out, "无项目") {
+		t.Errorf("空报告应含『无项目』占位\n实际:\n%s", out)
+	}
+}
+
+// TestFormatGroupReportAverageHealth 验证平均分的四舍五入。
+// 构造两个 go 项目，分数 90 和 95，平均 92.5 → 四舍五入 93。
+func TestFormatGroupReportAverageHealth(t *testing.T) {
+	r := Report{
+		ProjectCount: 2,
+		Projects: []ProjectView{
+			{Slug: "a", StackPrimary: "go", HealthScore: 90},
+			{Slug: "b", StackPrimary: "go", HealthScore: 95},
+		},
+	}
+	out := FormatGroupReport(r)
+	// (90+95)/2 = 92.5 → (185 + 1)/2 = 93。
+	if !strings.Contains(out, "平均健康 93") {
+		t.Errorf("平均分 92.5 应四舍五入为 93\n实际:\n%s", out)
+	}
+}
+
+// TestAverageHealth 验证平均分计算（直接单测，含四舍五入与零安全）。
+func TestAverageHealth(t *testing.T) {
+	if got := averageHealth(nil); got != 0 {
+		t.Errorf("空切片应返回 0，实际 %d", got)
+	}
+	// 单个：直接返回该分。
+	if got := averageHealth([]ProjectView{{HealthScore: 42}}); got != 42 {
+		t.Errorf("单元素应返回该分 42，实际 %d", got)
+	}
+	// (10+20+30)/3 = 20。
+	if got := averageHealth([]ProjectView{{HealthScore: 10}, {HealthScore: 20}, {HealthScore: 30}}); got != 20 {
+		t.Errorf("(10+20+30)/3 应 20，实际 %d", got)
+	}
+	// (1+2)/2 = 1.5 → (3+1)/2 = 2（四舍五入）。
+	if got := averageHealth([]ProjectView{{HealthScore: 1}, {HealthScore: 2}}); got != 2 {
+		t.Errorf("(1+2)/2 应四舍五入为 2，实际 %d", got)
+	}
+	// (1+1+1+1+1)/5 = 1，无舍入误差。
+	if got := averageHealth([]ProjectView{{HealthScore: 1}, {HealthScore: 1}, {HealthScore: 1}, {HealthScore: 1}, {HealthScore: 1}}); got != 1 {
+		t.Errorf("五个 1 平均应 1，实际 %d", got)
+	}
+}
+
+// TestSortStrings 验证内部排序工具（确定性字母序）。
+func TestSortStrings(t *testing.T) {
+	cases := [][]string{
+		{"go", "rust", "node/ts", "unknown"},
+		{"c", "b", "a"},
+		{"single"},
+		{},
+		{"z", "a", "m", "b", "q"},
+	}
+	want := [][]string{
+		{"go", "node/ts", "rust", "unknown"},
+		{"a", "b", "c"},
+		{"single"},
+		{},
+		{"a", "b", "m", "q", "z"},
+	}
+	for i, in := range cases {
+		got := append([]string(nil), in...)
+		sortStrings(got)
+		if len(got) != len(want[i]) {
+			t.Errorf("case %d 长度错 got %v want %v", i, got, want[i])
+			continue
+		}
+		for j := range got {
+			if got[j] != want[i][j] {
+				t.Errorf("case %d 位置 %d 错 got %v want %v", i, j, got, want[i])
+				break
+			}
+		}
+	}
+}

@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -84,6 +86,8 @@ func RunWithOptions(p Pipeline, opts ...RunOption) *RunResult {
 	}
 	// 每步的输出暂存（供下游拼接）
 	outputs := map[string]Rows{}
+	// 已完成步骤的结果（供 When 条件求值查上游 RowsOut）。Skipped/失败也算"已完成"。
+	resultsByID := map[string]StepResult{}
 
 	for _, id := range order {
 		s := stepByID[id]
@@ -96,7 +100,29 @@ func RunWithOptions(p Pipeline, opts ...RunOption) *RunResult {
 			sr.Skipped = true
 			sr.Duration = time.Since(start)
 			result.Steps = append(result.Steps, sr)
+			resultsByID[id] = sr
 			continue
+		}
+
+		// 条件执行：When 非空时求值，不满足则 Skipped=true 跳过（不算失败）。
+		if s.When != "" {
+			ok, err := evalWhen(s.When, resultsByID)
+			if err != nil {
+				// 条件表达式非法：视为步骤失败（让上游能感知到配置错误）。
+				sr.Err = fmt.Errorf("步骤 %s 的 when 条件非法: %w", id, err)
+				sr.Duration = time.Since(start)
+				result.Steps = append(result.Steps, sr)
+				resultsByID[id] = sr
+				result.Err = sr.Err
+				return result
+			}
+			if !ok {
+				sr.Skipped = true
+				sr.Duration = time.Since(start)
+				result.Steps = append(result.Steps, sr)
+				resultsByID[id] = sr
+				continue
+			}
 		}
 
 		// 收集依赖的输出作为输入（transform/sink 用）。
@@ -186,6 +212,7 @@ func RunWithOptions(p Pipeline, opts ...RunOption) *RunResult {
 		}
 		sr.Duration = time.Since(start)
 		result.Steps = append(result.Steps, sr)
+		resultsByID[id] = sr
 	}
 	return result
 }
@@ -253,4 +280,97 @@ func withRetrySink(retries int, conn SinkConnector, rows Rows, cfg map[string]an
 		}
 	}
 	return lastErr
+}
+
+// ===== 条件执行（When 字段）=====
+
+// evalWhen 求值步骤的 When 条件表达式，返回是否应执行该步骤。
+//
+// 仅支持极简形式（任务约定的子集）：
+//
+//	{{stepID.rows_out}} OP number
+//
+// 其中 OP ∈ {>、>=、<、<=、==、!=}，number 是整数字面量（如 0）。
+// 左侧 {{...}} 内 stepID 必须是已执行的上游步骤；取它的 StepResult.RowsOut 与右侧比较。
+// 上游步骤尚未执行（不在 resultsByID 中）视为 RowsOut=0。
+//
+// 不支持的语法返回错误（让 runner 把步骤标记为失败，暴露配置问题）。
+//
+// 例：when: "{{read.rows_out}} > 0" 表示"仅当上游 read 输出非空时才执行本步骤"。
+func evalWhen(expr string, resultsByID map[string]StepResult) (bool, error) {
+	lhs, op, rhs, err := parseCondition(expr)
+	if err != nil {
+		return false, err
+	}
+	leftVal := fetchMetric(lhs, resultsByID)
+	switch op {
+	case ">":
+		return leftVal > rhs, nil
+	case ">=":
+		return leftVal >= rhs, nil
+	case "<":
+		return leftVal < rhs, nil
+	case "<=":
+		return leftVal <= rhs, nil
+	case "==":
+		return leftVal == rhs, nil
+	case "!=":
+		return leftVal != rhs, nil
+	}
+	return false, fmt.Errorf("不支持的操作符 %q", op)
+}
+
+// parseCondition 解析 "{{stepID.metric}} OP number" 形式的表达式。
+// 返回左侧占位符原文（含 {{}}）、操作符、右侧整数值。
+func parseCondition(expr string) (lhs, op string, rhs int64, err error) {
+	s := strings.TrimSpace(expr)
+	open := strings.Index(s, "{{")
+	close := strings.Index(s, "}}")
+	if open < 0 || close < 0 || close < open {
+		return "", "", 0, fmt.Errorf("when 表达式缺少 {{...}} 占位符: %q", expr)
+	}
+	lhs = s[open : close+2] // 含 {{ }}
+	rest := strings.TrimSpace(s[close+2:])
+
+	// 按操作符长度从长到短匹配，避免 ">=" 被 ">" 误吞。
+	for _, cand := range []string{">=", "<=", "==", "!=", ">", "<"} {
+		if strings.HasPrefix(rest, cand) {
+			op = cand
+			rest = strings.TrimSpace(rest[len(cand):])
+			break
+		}
+	}
+	if op == "" {
+		return "", "", 0, fmt.Errorf("when 表达式缺少比较操作符 (> >= < <= == !=): %q", expr)
+	}
+
+	n, perr := strconv.ParseInt(rest, 10, 64)
+	if perr != nil {
+		return "", "", 0, fmt.Errorf("when 表达式右侧应为整数, 得 %q: %w", rest, perr)
+	}
+	return lhs, op, n, nil
+}
+
+// fetchMetric 从 {{stepID.metric}} 占位符中提取 stepID 与 metric 名，
+// 在 resultsByID 中查上游步骤对应字段。当前仅支持 rows_out；其余返回 0 + nil。
+// stepID 不存在（上游未执行/不存在）时返回 0——等价于该上游 RowsOut=0。
+func fetchMetric(placeholder string, resultsByID map[string]StepResult) int64 {
+	inner := strings.Trim(placeholder, "{} ")
+	dot := strings.LastIndex(inner, ".")
+	if dot < 0 {
+		return 0
+	}
+	stepID := inner[:dot]
+	metric := inner[dot+1:]
+	sr, ok := resultsByID[stepID]
+	if !ok {
+		return 0
+	}
+	switch metric {
+	case "rows_out":
+		return int64(sr.RowsOut)
+	case "rows_in":
+		return int64(sr.RowsIn)
+	}
+	return 0
 }

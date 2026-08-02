@@ -154,6 +154,40 @@ func (m *Matcher) ReplaceAll(text, replacement string) string {
 	return string(out)
 }
 
+// Split 按正则分割字符串，返回分割后的子串切片。
+// 连续匹配产生空串（与 Go 标准库 regexp.Split 行为一致）。
+//
+// 参数 n 控制返回的子串数：
+//   - n < 0：返回所有子串（末尾不截断）。
+//   - n == 0：返回 nil（与 regexp.Split 行为一致——0 被视作无意义请求）。
+//   - n > 0：最多返回 n 个子串；最后一个子串是"第 n-1 次分割点之后未再分割的剩余文本"。
+//
+// 与标准库语义一致：分隔符不包含在结果里；首尾的匹配分别产生一个空串（前缀/后缀）。
+// 例如用 \s+ 分割 "a  b" 得到 ["a","b"]；分割 " a " 得到 ["","a",""]。
+func (m *Matcher) Split(text string, n int) []string {
+	if n == 0 {
+		return nil
+	}
+	matches := m.FindAll(text)
+	// n > 0 时：至多再切 (n-1) 刀，超出范围的匹配不再切分。
+	cut := len(matches)
+	if n > 0 && cut > n-1 {
+		cut = n - 1
+	}
+
+	runes := []rune(text)
+	out := make([]string, 0, cut+1)
+	cursor := 0 // 下一个未拷贝的 rune 位置
+	for i := 0; i < cut; i++ {
+		mt := matches[i]
+		out = append(out, string(runes[cursor:mt.Start]))
+		cursor = mt.End
+	}
+	// 拼接末尾剩余（含未参与切分的匹配及其后的文本）
+	out = append(out, string(runes[cursor:]))
+	return out
+}
+
 // matchLongestFrom 从 start 位置开始跑 NFA，返回能到达接受状态的最远位置（不含）。
 // 若从 start 起任何时刻（含 start 本身，如 a* 对空串）都不能接受，返回 -1。
 // 这是 POSIX "最左最长" 语义：记录最后一次进入接受态的位置。

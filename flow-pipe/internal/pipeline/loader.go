@@ -21,6 +21,7 @@ type stepYAML struct {
 	DependsOn  []string        `yaml:"depends_on"`
 	Retry      int             `yaml:"retry"`       // 失败重试次数（默认 0）
 	DeadLetter *deadLetterYAML `yaml:"dead_letter"` // 死信处理
+	When       string          `yaml:"when"`        // 条件表达式（如 "{{stepID.rows_out}} > 0"）
 }
 
 type deadLetterYAML struct {
@@ -80,7 +81,7 @@ func Parse(raw []byte) (*Pipeline, error) {
 		s := Step{
 			ID: sy.ID, Kind: sy.Type, Connector: sy.Connector,
 			Config: sy.Config, DependsOn: sy.DependsOn,
-			Retry: sy.Retry,
+			Retry: sy.Retry, When: sy.When,
 		}
 		if sy.DeadLetter != nil {
 			s.DeadLetter = &DeadLetterConfig{

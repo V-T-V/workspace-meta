@@ -442,6 +442,19 @@ func (itp *Interpreter) evalExpr(expr core.Expr, env *Environment) (any, error) 
 			return string(runes[i]), nil
 		}
 		return nil, core.NewError(e.Loc, "无法对 %s 做索引操作", typeName(arr))
+	case *core.FnExpr:
+		// 匿名函数表达式求值：产生一个 function value，捕获当前 env 作为闭包。
+		// 复用 FnDecl 表示（Name 留空），让 callFunction / evalCall 统一处理。
+		// closure=env 是闭包的关键：函数体内可访问定义时可见的外层变量。
+		return &function{
+			decl: &core.FnDecl{
+				Loc:    e.Loc,
+				Name:   "", // 匿名函数无名
+				Params: e.Params,
+				Body:   e.Body,
+			},
+			closure: env,
+		}, nil
 	}
 	return nil, core.NewError(expr.NodeLoc(), "未知表达式类型 %T", expr)
 }
@@ -574,6 +587,15 @@ func (itp *Interpreter) evalCall(e *core.CallExpr, env *Environment) (any, error
 	}
 	fn, ok := itp.funcs[e.Callee]
 	if !ok {
+		// 不在函数表里：检查环境里是否有同名变量且值是 function（一等函数调用）。
+		// 支持 let f = fn(x){...}; f(5); 这类通过变量名调用匿名/闭包函数。
+		if v, vok := env.Get(e.Callee); vok {
+			if fv, fok := v.(*function); fok {
+				fn = fv
+			}
+		}
+	}
+	if fn == nil {
 		return nil, core.NewError(e.Loc, "未定义的函数 %q", e.Callee)
 	}
 	if len(e.Args) != len(fn.decl.Params) {
@@ -589,10 +611,11 @@ func (itp *Interpreter) evalCall(e *core.CallExpr, env *Environment) (any, error
 		}
 		args[i] = v
 	}
-	// 新建函数环境：parent 指向 globals。
-	// 注意：顶层函数的 closure=globals，行为不变。
-	// 嵌套函数的闭包支持是 M3 候选（当前不形成闭包，避免 Environment 链成环）。
-	callEnv := NewEnvironment(itp.globals)
+	// 新建函数环境：parent 指向函数的闭包环境（定义时捕获的环境）。
+	//   - 顶层命名函数的 closure=globals，行为不变。
+	//   - 一等函数（FnExpr 产生的 function value）的 closure=定义时 env，
+	//     实现闭包：函数体可访问外层局部变量。
+	callEnv := NewEnvironment(fn.closure)
 	for i, name := range fn.decl.Params {
 		callEnv.Set(name, args[i])
 	}
