@@ -736,6 +736,70 @@ func TestCompileError(t *testing.T) {
 	}
 }
 
+func TestMatchString(t *testing.T) {
+	// 命中
+	ok, err := MatchString(`\d+`, "abc123")
+	if err != nil {
+		t.Fatalf("MatchString 不应报错: %v", err)
+	}
+	if !ok {
+		t.Error(`MatchString(\d+, "abc123") 应为 true（含 123 子串）`)
+	}
+	// 不命中
+	ok, err = MatchString(`\d+`, "abc")
+	if err != nil {
+		t.Fatalf("MatchString 不应报错: %v", err)
+	}
+	if ok {
+		t.Error(`MatchString(\d+, "abc") 应为 false（无数字）`)
+	}
+	// 完整字面量子串
+	ok, err = MatchString("hello", "say hello!")
+	if err != nil || !ok {
+		t.Errorf(`MatchString("hello", "say hello!") 应为 true, got (%v, %v)`, ok, err)
+	}
+	// 空串与可匹配空串的模式（a*）
+	ok, err = MatchString("a*", "")
+	if err != nil || !ok {
+		t.Errorf(`MatchString("a*", "") 应为 true, got (%v, %v)`, ok, err)
+	}
+}
+
+func TestMatchStringError(t *testing.T) {
+	// 非法 pattern 应返回 (false, error)，而非 panic。
+	ok, err := MatchString("[unclosed", "text")
+	if err == nil {
+		t.Error("MatchString 对非法 pattern 应返回 error")
+	}
+	if ok {
+		t.Error("MatchString 编译失败时应返回 false，而非 true")
+	}
+}
+
+func TestMustMatchString(t *testing.T) {
+	// 合法 pattern：正常返回匹配结果。
+	if !MustMatchString(`\w+`, "hello world") {
+		t.Error(`MustMatchString(\w+, "hello world") 应为 true`)
+	}
+	if MustMatchString(`^\d+$`, "abc") {
+		t.Error(`MustMatchString(^\d+$, "abc") 应为 false`)
+	}
+	// 锚定全匹配
+	if !MustMatchString(`^abc$`, "abc") {
+		t.Error(`MustMatchString(^abc$, "abc") 应为 true`)
+	}
+}
+
+func TestMustMatchStringPanic(t *testing.T) {
+	// 非法 pattern 应 panic。
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustMatchString 对非法 pattern 应 panic")
+		}
+	}()
+	_ = MustMatchString("[unclosed", "text")
+}
+
 // ===== 锚点 ^ $ =====
 
 func TestAnchorStartMatch(t *testing.T) {

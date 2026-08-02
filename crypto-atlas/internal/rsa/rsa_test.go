@@ -181,3 +181,57 @@ func TestDemoRuns(t *testing.T) {
 		t.Error("demo 验签应通过")
 	}
 }
+
+// TestSignatureDemo 验证 SignatureDemo 完整流程的所有断言：
+//   - 正常消息验签通过
+//   - 篡改消息验签失败
+//   - HMAC 正常验证通过、篡改验证失败
+//   - RSA 签名与解密同形（Sign(m) == m^D mod N，与 Decrypt(m) 一致）
+func TestSignatureDemo(t *testing.T) {
+	r, err := SignatureDemo(context.Background())
+	if err != nil {
+		t.Fatalf("SignatureDemo: %v", err)
+	}
+
+	// 步骤 3：正常验签必须通过。
+	if !r.VerifiedValid {
+		t.Error("正常消息验签应通过（VerifiedValid 应为 true）")
+	}
+
+	// 步骤 4：篡改消息验签必须失败。
+	if r.VerifiedTampered {
+		t.Error("篡改消息后验签应失败（VerifiedTampered 应为 false）")
+	}
+
+	// 篡改消息必须与原消息不同（否则上面的断言没意义）。
+	if r.TamperedMessage.Cmp(r.Message) == 0 {
+		t.Error("TamperedMessage 应不同于原 Message")
+	}
+
+	// 步骤 5：HMAC 正常验证通过、篡改失败。
+	if !r.HmacVerified {
+		t.Error("HMAC 正常验证应通过（HmacVerified 应为 true）")
+	}
+	if r.HmacTamperedVerified {
+		t.Error("HMAC 篡改验证应失败（HmacTamperedVerified 应为 false）")
+	}
+
+	// HMAC MAC 应为非空的 hex 字符串（SHA-256 → 32 字节 → 64 hex 字符）。
+	if len(r.HmacMAC) != 64 {
+		t.Errorf("HMAC-SHA256 应为 64 个 hex 字符，实际 %d", len(r.HmacMAC))
+	}
+
+	// Comparison 文本不能为空（教学对比说明）。
+	if r.Comparison == "" {
+		t.Error("Comparison 不应为空")
+	}
+
+	// 交叉校验：Signature 应等于把 Message 当密文做 Decrypt 的结果
+	// （两者都是 m^D mod N）。
+	if dec, err := Decrypt(r.Message, r.Priv); err != nil {
+		t.Fatalf("Decrypt 交叉校验失败: %v", err)
+	} else if dec.Cmp(r.Signature) != 0 {
+		t.Errorf("Sign(m) 应等于 Decrypt(m)（同为 m^D mod N），实际 Sign=%s Decrypt=%s",
+			r.Signature.String(), dec.String())
+	}
+}

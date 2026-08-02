@@ -839,3 +839,142 @@ func itoa(n int) string {
 	}
 	return string(buf[i:])
 }
+
+// ===== 选举超时参数调优 =====
+
+// TestElectionTimeoutTuning 验证选举超时分布对选举竞争的影响，以及 quorum
+// 如何在竞争场景下仍保证安全（任一时刻集群最多一个 Leader）。
+//
+// 两个对照配置（3 节点集群，每轮 = 全部节点 Tick 一次 + Drain 一次）：
+//
+//  1. 分散（spread）：超时 {3, 10, 20} —— 最低者远早于其它节点觉醒，
+//     它发出的 RequestVote 在同一轮 Drain 内被对端收到并投票，对端投票时
+//     会把 electionTicks 重置为 0（见 handleRequestVote），于是其它节点
+//     永远不会先觉醒发起选举。结论：始终只有 n1 成为 Candidate，无竞争。
+//
+//  2. 紧凑（compact）：超时 {3, 3, 5} —— n1 与 n2 共享同一最小超时，
+//     二者在同一轮 Tick 内先后觉醒成为 Candidate（RequestVote 在 Drain 才
+//     投递，所以两个 Candidate 在被对方拒绝前都已自投 + 发起投票）→ 选举竞争。
+//     但 quorum=2（3 节点）使得选票不会无主：先拿到多数票者当选，最终仍只有一个 Leader。
+//
+// 注：任务示例给的紧凑配置是 3/4/5。在"每 tick 都 Drain"的确定性驱动模型下，
+// n1 在第 3 tick 觉醒并发起 RequestVote，同一轮 Drain 即把投票送达 n2/n3 并
+// 把它们的 electionTicks 清零，所以 n2 不会在第 4 tick 觉醒——3/4/5 实际并不
+// 产生并发 Candidate。要稳定复现"多 Candidate 同时觉醒"，需要让两个节点的
+// ElectionTimeout 完全相等（如 3/3/5），使它们在同一 tick 同时跨过阈值、
+// 在 Drain 投递投票之前都已 startElection。这正是 Raft 论文 §5.4.1 用随机化
+// 选举超时打散的"split vote"场景：本测试用相等的超时人为构造它来验证 quorum 的安全性。
+func TestElectionTimeoutTuning(t *testing.T) {
+	// spread 配置：最低超时者总是当选，全程无选举竞争。
+	t.Run("SpreadNoContention", func(t *testing.T) {
+		ids := []core.NodeID{"n1", "n2", "n3"}
+		timeouts := map[core.NodeID]int{"n1": 3, "n2": 10, "n3": 20}
+		stats, nodes := simulateElection(ids, timeouts, 40)
+
+		if stats.maxConcurrentCands != 1 {
+			t.Errorf("分散配置应全程无竞争（最大并发 Candidate 应为 1），实际 %d", stats.maxConcurrentCands)
+		}
+		if len(stats.everCandidates) != 1 || !stats.everCandidates["n1"] {
+			t.Errorf("分散配置应只有 n1（最低超时）成为 Candidate，实际 ever=%v", stats.everCandidates)
+		}
+		if stats.leaderCount != 1 {
+			t.Fatalf("应选出唯一 Leader（quorum 保证），实际 %d 个 Leader", stats.leaderCount)
+		}
+		if stats.leaders[0].ID != "n1" {
+			t.Errorf("应最低超时者 n1 当选，实际 %s", stats.leaders[0].ID)
+		}
+		// n2/n3 从未觉醒发起选举，始终是 Follower。
+		for _, id := range []core.NodeID{"n2", "n3"} {
+			if nodes[id].State != core.StateFollower {
+				t.Errorf("%s 应保持 Follower（从未发起选举），实际 %s", id, nodes[id].State)
+			}
+			if stats.everCandidates[id] {
+				t.Errorf("%s 不应成为过 Candidate", id)
+			}
+		}
+		t.Logf("分散配置 OK：并发峰值=%d, ever=%v, Leader=%s",
+			stats.maxConcurrentCands, stats.everCandidates, stats.leaders[0].ID)
+	})
+
+	// compact 配置：相等的最小超时 → 多 Candidate 同时觉醒（选举竞争），
+	// 但 quorum 机制保证最终唯一 Leader 当选。
+	t.Run("CompactContentionButSingleLeader", func(t *testing.T) {
+		ids := []core.NodeID{"n1", "n2", "n3"}
+		timeouts := map[core.NodeID]int{"n1": 3, "n2": 3, "n3": 5}
+		stats, nodes := simulateElection(ids, timeouts, 40)
+
+		if stats.maxConcurrentCands < 2 {
+			t.Errorf("紧凑配置（n1/n2 同为超时 3）应产生选举竞争（≥2 并发 Candidate），实际最大 %d",
+				stats.maxConcurrentCands)
+		}
+		// 竞争者至少含 n1 和 n2（二者同一 tick 觉醒）。
+		if !stats.everCandidates["n1"] || !stats.everCandidates["n2"] {
+			t.Errorf("紧凑配置应 n1、n2 都曾成为 Candidate（选举竞争），实际 ever=%v", stats.everCandidates)
+		}
+		// quorum 安全性：最终恰有一个 Leader，且不再有 Candidate 悬而未决。
+		if stats.leaderCount != 1 {
+			var lids []string
+			for _, ld := range stats.leaders {
+				lids = append(lids, string(ld.ID))
+			}
+			t.Fatalf("quorum 应保证最终唯一 Leader，实际 %d 个 Leader: %v", stats.leaderCount, lids)
+		}
+		candRemain := 0
+		for _, id := range ids {
+			if nodes[id].State == core.StateCandidate {
+				candRemain++
+			}
+		}
+		if candRemain != 0 {
+			t.Errorf("选举稳定后不应残留 Candidate，实际 %d 个", candRemain)
+		}
+		t.Logf("紧凑配置 OK：并发峰值=%d, ever=%v, 最终唯一 Leader=%s（竞争被 quorum 收敛）",
+			stats.maxConcurrentCands, stats.everCandidates, stats.leaders[0].ID)
+	})
+}
+
+// electionStats 收集一次选举模拟的统计量。
+type electionStats struct {
+	maxConcurrentCands int                  // 整个模拟中任一时刻并发 Candidate 的峰值
+	everCandidates     map[core.NodeID]bool // 所有曾经成为过 Candidate 的节点
+	leaders            []*Node              // 模拟结束时处于 Leader 状态的节点
+	leaderCount        int
+}
+
+// simulateElection 用给定的节点/超时配置跑 rounds 轮选举。
+// 每轮 = 全部节点各 Tick 一次 + Drain 一次（drain 即投递本轮积压的消息并处理回复）。
+// 在每轮 Tick 完成、Drain 之前统计并发 Candidate 数（这是"同 tick 觉醒"竞争的观察点）。
+func simulateElection(ids []core.NodeID, timeouts map[core.NodeID]int, rounds int) (electionStats, map[core.NodeID]*Node) {
+	tr := core.NewMemTransport()
+	nodes := make(map[core.NodeID]*Node, len(ids))
+	for _, id := range ids {
+		n := NewNode(id, ids, timeouts[id], tr)
+		n.Start()
+		nodes[id] = n
+	}
+	stats := electionStats{everCandidates: map[core.NodeID]bool{}}
+	for round := 0; round < rounds; round++ {
+		for _, id := range ids {
+			nodes[id].Tick()
+		}
+		// Tick 之后、Drain 之前：统计并发 Candidate（并记录"曾经成为"集合）。
+		concurrent := 0
+		for _, id := range ids {
+			if nodes[id].State == core.StateCandidate {
+				concurrent++
+				stats.everCandidates[id] = true
+			}
+		}
+		if concurrent > stats.maxConcurrentCands {
+			stats.maxConcurrentCands = concurrent
+		}
+		tr.Drain()
+	}
+	for _, id := range ids {
+		if nodes[id].State == core.StateLeader {
+			stats.leaders = append(stats.leaders, nodes[id])
+		}
+	}
+	stats.leaderCount = len(stats.leaders)
+	return stats, nodes
+}

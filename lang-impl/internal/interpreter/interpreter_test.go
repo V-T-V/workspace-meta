@@ -912,3 +912,47 @@ return g();`
 		t.Errorf("g() 应为 99，实际 %d", got)
 	}
 }
+
+// TestClosureCounter 验证递归闭包（counter 工厂模式）。
+//
+// makeCounter 返回一个闭包，闭包内通过裸赋值 count = count + 1 修改外层
+// makeCounter 作用域里捕获的 count。每次调用闭包都更新同一个被捕获的环境，
+// 因此多次调用 c() 累计递增：1, 2, 3。
+//
+// 这是验证已有的 fn 表达式 + 闭包能正确支持"递归状态捕获"：
+//   - 闭包捕获的是定义时的环境（makeCounter 的块作用域），而非调用现场的环境；
+//   - 多次调用同一个闭包共享同一个被捕获的环境；
+//   - 闭包内的裸赋值（IsAssign）通过 Environment.Set 沿链向上找到并更新那层
+//     被捕获的变量，而非在闭包自己的调用层新建变量。
+func TestClosureCounter(t *testing.T) {
+	src := `let makeCounter = fn() {
+  let count = 0;
+  return fn() {
+    count = count + 1;
+    return count;
+  };
+};
+let c = makeCounter();
+return c() + c() + c();` // 1+2+3 = 6
+	if got := runInt(t, src); got != 6 {
+		t.Errorf("counter 闭包三次调用累加应为 6（1+2+3），实际 %d", got)
+	}
+}
+
+// TestClosureCounterIndependent 验证两个独立 counter 互不干扰：
+// 每次调用 makeCounter() 都新建一个独立的捕获环境。
+func TestClosureCounterIndependent(t *testing.T) {
+	src := `let makeCounter = fn() {
+  let count = 0;
+  return fn() {
+    count = count + 1;
+    return count;
+  };
+};
+let a = makeCounter();
+let b = makeCounter();
+return a() + a() + b();` // a:1, a:2, b:1 → 4
+	if got := runInt(t, src); got != 4 {
+		t.Errorf("两个独立 counter 应为 4（a=1,a=2,b=1），实际 %d", got)
+	}
+}

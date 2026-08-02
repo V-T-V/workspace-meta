@@ -554,3 +554,33 @@ func Compile(pattern string) (*Matcher, error) {
 	}
 	return New(nfa.Build(ast)), nil
 }
+
+// MatchString 报告 text 是否匹配 pattern（一步编译+匹配，unanchored 子串匹配）。
+//
+// 适用于"只匹配一次就丢弃"的简单场景；若需要对同一模式多次匹配，应先用
+// Compile 编译出 Matcher 复用，避免重复解析/构建 NFA。
+//
+// 等价于：
+//
+//	m, err := Compile(pattern)
+//	if err != nil { return false, err }
+//	return m.Match(text), nil
+func MatchString(pattern, text string) (bool, error) {
+	m, err := Compile(pattern)
+	if err != nil {
+		return false, err
+	}
+	return m.Match(text), nil
+}
+
+// MustMatchString 同 MatchString，但编译失败时 panic 而非返回 error。
+//
+// 适用于 pattern 是编译期常量、不可能非法的场景（如测试、表驱动用例），
+// 可省去错误处理。运行期外部输入的 pattern 不要用本函数。
+func MustMatchString(pattern, text string) bool {
+	m, err := Compile(pattern)
+	if err != nil {
+		panic(err)
+	}
+	return m.Match(text)
+}

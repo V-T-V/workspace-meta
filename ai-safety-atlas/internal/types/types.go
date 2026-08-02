@@ -100,6 +100,43 @@ func RiskScore(detections []Detection) int {
 	return score
 }
 
+// ConfidenceScore 根据检测结果的命中数和严重度计算置信度（0-1）。
+//
+// 直觉：当同一输入被多条不同规则同时命中、且其中有高/严重级别的规则，
+// 我们对"这确实是一次攻击"的判断就更可信（多规则交叉印证 + 高严重度）。
+//
+// 公式（封顶 1.0，不会出现负值，因为命中数和加权都 >= 0）：
+//
+//	base = 命中规则数 × 0.15            // 规则越多越确信
+//	+ HIGH 严重度的检测每个 +0.2        // 高危规则命中显著提升置信度
+//	+ CRITICAL 严重度的检测每个 +0.3    // 严重规则命中进一步提升
+//	min(score, 1.0)
+//
+// 与 RiskScore 的区别：RiskScore 用"最高严重度的 base + 中等以上叠加"算 0-100
+// 的风险分（强调"最坏的那条"）；ConfidenceScore 强调"证据数量 × 严重度"算 0-1
+// 的置信度（强调"有多少条规则一起说这是攻击"）。两者互补：一个判断危害程度，
+// 一个判断判断本身的可靠性。
+//
+// 空输入返回 0（无证据 → 无置信度）。
+func ConfidenceScore(detections []Detection) float64 {
+	if len(detections) == 0 {
+		return 0
+	}
+	score := float64(len(detections)) * 0.15
+	for _, d := range detections {
+		switch d.Severity {
+		case SeverityHigh:
+			score += 0.2
+		case SeverityCritical:
+			score += 0.3
+		}
+	}
+	if score > 1.0 {
+		score = 1.0
+	}
+	return score
+}
+
 // RiskLevel 把 0-100 的分数转成可读等级。
 func RiskLevel(score int) string {
 	switch {

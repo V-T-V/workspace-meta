@@ -3,6 +3,8 @@
 package report
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -112,12 +114,13 @@ func (r *Registry) Formats() []string {
 	return out
 }
 
-// DefaultRegistry 返回注册了 text/json/markdown 三种格式的默认注册表。
+// DefaultRegistry 返回注册了 text/json/markdown/csv 四种格式的默认注册表。
 func DefaultRegistry() *Registry {
 	r := NewRegistry()
 	r.Register("text", TextReporter{})
 	r.Register("json", JSONReporter{})
 	r.Register("markdown", MarkdownReporter{})
+	r.Register("csv", CSVReporter{})
 	return r
 }
 
@@ -190,6 +193,73 @@ func (MarkdownReporter) Format(r Report) string {
 			boolMark(p.HasAgentsMD), or(git, "-"), p.HealthScore)
 	}
 	return b.String()
+}
+
+// ===== CSV =====
+
+// CSVReporter 输出 CSV 表格，便于外部工具（Excel/数据管道）消费。
+//
+// 列固定为：slug,stack,tests,agents,git,health_score。
+//   - stack: 用 StackPrimary，空栈留空（与 text/markdown 的 "-" 占位不同，
+//     CSV 里空值更便于下游解析，无需额外做 "-"→"" 转换）。
+//   - agents: "true" / "false"（避免 ✓/✗ 这种非 ASCII 符号在 CSV 里造成编码麻烦）。
+//   - git: "branch" 或 "branch*"（* 标 dirty，沿用本项目其他 reporter 的约定）。
+//
+// 用标准库 encoding/csv 处理引号/转义（如 slug 含逗号、引号、换行），
+// 行尾统一 \n（csv.Writer 默认 \r\n，这里显式重置为 \n，与项目其他 reporter 一致）。
+type CSVReporter struct{}
+
+// Format 实现 Reporter。
+func (CSVReporter) Format(r Report) string {
+	var buf bytes.Buffer
+	// 用 \n 行尾，避免 csv 默认的 \r\n 在跨工具消费时混入回车。
+	w := csv.NewWriter(&buf)
+	w.UseCRLF = false
+	// Write 内部对字段做标准 CSV 转义（含逗号/引号/换行时自动加双引号）。
+	_ = w.Write([]string{"slug", "stack", "tests", "agents", "git", "health_score"})
+	for _, p := range r.Projects {
+		stack := p.StackPrimary
+		agents := "false"
+		if p.HasAgentsMD {
+			agents = "true"
+		}
+		tests := or(p.TestCount, "0")
+		git := p.GitBranch
+		if p.GitDirty {
+			git += "*"
+		}
+		_ = w.Write([]string{
+			p.Slug, stack, tests, agents, git,
+			itoa(p.HealthScore),
+		})
+	}
+	w.Flush()
+	return buf.String()
+}
+
+// itoa 把 int 转成十进制字符串（纯标准库，避免为单点用途引入 strconv 到上层）。
+// 与本项目已有 sortStrings 一样，用最朴素实现，不处理负数以外的格式问题。
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := false
+	if n < 0 {
+		neg = true
+		n = -n
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
 }
 
 // ===== 辅助 =====

@@ -1,6 +1,7 @@
 package report
 
 import (
+	"encoding/csv"
 	"strings"
 	"testing"
 
@@ -71,6 +72,101 @@ func TestJSONReporter(t *testing.T) {
 	}
 }
 
+// TestCSVReporter 验证 CSV 格式：表头、列顺序、行数、用 encoding/csv 能正确解析。
+func TestCSVReporter(t *testing.T) {
+	r := Build(sampleFacts())
+	out := CSVReporter{}.Format(r)
+
+	// 表头含全部 6 列。
+	if !strings.HasPrefix(out, "slug,stack,tests,agents,git,health_score") {
+		t.Errorf("CSV 表头应为首行 6 列\n实际: %s", out)
+	}
+
+	// 用标准库 csv 解析，确保转义合法、可被下游消费。
+	rows, err := csvReader(out)
+	if err != nil {
+		t.Fatalf("CSV 输出无法被 encoding/csv 解析: %v\n原始:\n%s", err, out)
+	}
+	// 1 行表头 + 2 行数据 = 3 行。
+	if len(rows) != 3 {
+		t.Fatalf("CSV 应有 3 行（1 表头 + 2 数据），实际 %d\n原始:\n%s", len(rows), out)
+	}
+
+	// 验证 proj-a 行：slug=proj-a, stack=go, tests=12, agents=true, git=main, health=90。
+	wantA := []string{"proj-a", "go", "12", "true", "main", "90"}
+	if !equalSlice(rows[1], wantA) {
+		t.Errorf("proj-a 行应为 %v\n实际 %v\n原始:\n%s", wantA, rows[1], out)
+	}
+	// 验证 proj-b 行：git dirty 在 branch 后加 "*"。
+	wantB := []string{"proj-b", "node/ts", "5", "false", "dev*", "50"}
+	if !equalSlice(rows[2], wantB) {
+		t.Errorf("proj-b 行应为 %v（git dirty 加 *）\n实际 %v\n原始:\n%s", wantB, rows[2], out)
+	}
+}
+
+// TestCSVReporterEscaping 验证 CSV 转义：slug/stack 含逗号、引号时正确转义。
+func TestCSVReporterEscaping(t *testing.T) {
+	// 构造一个 slug 含逗号、stack 含引号的极端项目，验证 csv.Writer 的转义。
+	r := Report{
+		ProjectCount: 1,
+		Projects: []ProjectView{
+			{Slug: "a,b", StackPrimary: `go "stable"`, TestCount: "3", GitBranch: "main", HealthScore: 70},
+		},
+	}
+	out := CSVReporter{}.Format(r)
+	rows, err := csvReader(out)
+	if err != nil {
+		t.Fatalf("含特殊字符的 CSV 解析失败: %v\n原始:\n%s", err, out)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("应有 2 行，实际 %d", len(rows))
+	}
+	// 解析后应还原原始值（csv 转义对解析端透明）。
+	if rows[1][0] != "a,b" || rows[1][1] != `go "stable"` {
+		t.Errorf("CSV 转义后解析值错，slug/stack 应还原为 'a,b' / 'go \"stable\"'\n实际 %v", rows[1])
+	}
+}
+
+// TestCSVReporterInRegistry 验证 csv 已注册到 DefaultRegistry 且可取出使用。
+func TestCSVReporterInRegistry(t *testing.T) {
+	reg := DefaultRegistry()
+	rep, err := reg.Get("csv")
+	if err != nil || rep == nil {
+		t.Fatalf("Get(csv) 应成功，err=%v", err)
+	}
+	r := Build(sampleFacts())
+	out := rep.Format(r)
+	if !strings.HasPrefix(out, "slug,stack,tests,agents,git,health_score") {
+		t.Errorf("从 registry 取出的 csv reporter 输出表头不对\n实际: %s", out)
+	}
+}
+
+// TestCSVReporterEmpty 验证空报告只输出表头行（不 panic）。
+func TestCSVReporterEmpty(t *testing.T) {
+	out := CSVReporter{}.Format(Report{})
+	if out != "slug,stack,tests,agents,git,health_score\n" {
+		t.Errorf("空报告应只输出表头 + 换行\n实际: %q", out)
+	}
+}
+
+// csvReader 用 encoding/csv 解析 CSV 字符串为二维切片（测试辅助）。
+func csvReader(s string) ([][]string, error) {
+	return csv.NewReader(strings.NewReader(s)).ReadAll()
+}
+
+// equalSlice 比较两个等长字符串切片是否逐元素相等。
+func equalSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // TestRegistry 验证注册表的 Get/Formats。
 func TestRegistry(t *testing.T) {
 	reg := DefaultRegistry()
@@ -82,8 +178,8 @@ func TestRegistry(t *testing.T) {
 		t.Error("未注册的格式应返回错误")
 	}
 	formats := reg.Formats()
-	if len(formats) != 3 {
-		t.Errorf("应有 3 种格式，实际 %d", len(formats))
+	if len(formats) != 4 {
+		t.Errorf("应有 4 种格式（text/json/markdown/csv），实际 %d", len(formats))
 	}
 }
 

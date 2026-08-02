@@ -4,10 +4,11 @@
 //
 //	flow-pipe -config config.dev.yaml                 # 启动 REST API 服务
 //	flow-pipe -config config.dev.yaml -run pipe.yaml  # 跑一次管道后退出
+//	flow-pipe -batch ./examples                       # 批量跑目录下所有 .yaml/.yml 管道
 //	flow-pipe -dot pipe.yaml > pipeline.dot           # 导出管道 DAG 为 Graphviz DOT
 //	flow-pipe -version
 //
-// 匿名 import 连接器包以触发 init() 注册（source/transform/sink）。
+// 匿名 Import 连接器包以触发 init() 注册（source/transform/sink）。
 package main
 
 import (
@@ -23,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -43,6 +45,7 @@ var version = "dev"
 func main() {
 	configPath := flag.String("config", "config.dev.yaml", "配置文件路径（YAML）")
 	runPath := flag.String("run", "", "跑一次指定管道文件后退出（不启服务）")
+	batchDir := flag.String("batch", "", "批量跑目录下所有 .yaml/.yml 管道文件（按文件名排序，依次执行后退出）")
 	recover := flag.Bool("recover", false, "配合 -run 使用：跳过最近一次已成功完成的步骤（状态恢复）")
 	schedulePath := flag.String("schedule", "", "定时循环跑指定管道文件（按 -interval 间隔，Ctrl+C 退出）")
 	intervalSec := flag.Int("interval", 60, "-schedule 的触发间隔（秒）")
@@ -91,6 +94,15 @@ func main() {
 		cfg = config.Default()
 	}
 	log := logging.New(cfg.Logging.Level, cfg.Logging.Format)
+
+	// -batch 模式：批量跑目录下所有 .yaml/.yml 管道文件。
+	// 不需要数据库（与 -dot/-validate 同级），只加载+执行+打印摘要。
+	if *batchDir != "" {
+		if err := runBatch(*batchDir, log); err != nil {
+			exit(log, err)
+		}
+		return
+	}
 
 	dbPath, err := cfg.ResolveDBPath()
 	if err != nil {
@@ -189,6 +201,96 @@ func runOnce(db *sql.DB, path string, recover bool, log *slog.Logger) error {
 	}
 	if result.Err != nil {
 		return result.Err
+	}
+	return nil
+}
+
+// runBatch 扫描 dir 目录下所有 .yaml/.yml 管道文件，按文件名排序后依次执行。
+//
+// 设计：
+//   - 按文件名排序：保证可重现、确定的执行顺序（不依赖 OS ReadDir 的随机顺序）。
+//   - 单个管道失败不中断后续：记录失败但继续跑下一个，便于一次发现所有问题；
+//     汇总阶段若有失败则整体返回 error（让 main 以非零码退出）。
+//   - 不需要数据库：与 -dot/-validate 一样是纯加载+执行+打印，便于在 CI/脚本里
+//     一次性跑通一批样例管道。
+//
+// 用法示例：
+//
+//	flow-pipe -batch ./examples        # 跑 examples 下所有管道
+//	flow-pipe -batch pipelines/prod    # 批量跑生产管道
+func runBatch(dir string, log *slog.Logger) error {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("解析目录路径失败 %s: %w", dir, err)
+	}
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return fmt.Errorf("读取目录 %s 失败: %w", abs, err)
+	}
+
+	// 筛选 .yaml/.yml 并按文件名排序（确定顺序）。
+	var files []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+			files = append(files, name)
+		}
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("目录 %s 下没有 .yaml/.yml 管道文件", abs)
+	}
+	sort.Strings(files)
+
+	log.Info("[batch] 开始批量执行", "dir", abs, "count", len(files))
+	fmt.Printf("🚀 批量执行: %s（共 %d 个管道）\n", abs, len(files))
+
+	var failures []string
+	for i, name := range files {
+		path := filepath.Join(abs, name)
+		fmt.Printf("\n━━━━━━ [%d/%d] %s ━━━━━━\n", i+1, len(files), name)
+
+		p, err := pipeline.LoadFromFile(path)
+		if err != nil {
+			// 加载失败：记录并跳过，不中断整批。
+			fmt.Fprintf(os.Stderr, "❌ 加载失败: %v\n", err)
+			log.Error("[batch] 加载管道失败", "file", name, "err", err)
+			failures = append(failures, name+"(加载)")
+			continue
+		}
+
+		log.Info("[batch] 执行管道", "name", p.Name, "file", name)
+		result := pipeline.Run(*p)
+		fmt.Println(result.Summary())
+		for _, sr := range result.Steps {
+			status := "✓"
+			if sr.Err != nil {
+				status = "✗"
+			}
+			if sr.Skipped {
+				status = "⤵"
+			}
+			fmt.Printf("  %s [%s] %s: %d → %d 行 (%s)\n",
+				status, sr.Kind, sr.StepID, sr.RowsIn, sr.RowsOut, sr.Duration.Round(time.Millisecond))
+		}
+		if result.Err != nil {
+			fmt.Fprintf(os.Stderr, "❌ 管道 %q 执行失败: %v\n", p.Name, result.Err)
+			failures = append(failures, name+"(执行)")
+			log.Error("[batch] 管道执行失败", "file", name, "name", p.Name, "err", result.Err)
+		}
+	}
+
+	fmt.Printf("\n━━━━━━ 批量完成 ━━━━━━\n")
+	succ := len(files) - len(failures)
+	fmt.Printf("✅ 成功 %d / %d", succ, len(files))
+	if len(failures) > 0 {
+		fmt.Printf("，❌ 失败 %d: %s", len(failures), strings.Join(failures, ", "))
+	}
+	fmt.Println()
+	if len(failures) > 0 {
+		return fmt.Errorf("批量执行有 %d 个管道失败: %s", len(failures), strings.Join(failures, ", "))
 	}
 	return nil
 }
