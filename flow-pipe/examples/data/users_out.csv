@@ -1,0 +1,4 @@
+email,name,processed_at,source
+alice@x.com,alice,2026-08-01,imported
+bob@x.com,bob,2026-08-01,imported
+carol@x.com,carol,2026-08-01,imported

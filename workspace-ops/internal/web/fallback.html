@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>workspace-ops</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    h1 { border-bottom: 2px solid #00ADD8; padding-bottom: .5rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ddd; padding: .4rem .6rem; text-align: left; font-size: .9rem; }
+    th { background: #f4f4f4; }
+    .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; background: #00ADD8; color: #fff; font-size: .75rem; }
+    .yes { color: #2c8; } .no { color: #c33; }
+    #summary { margin: 1rem 0; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>workspace-ops <span class="badge">serve</span></h1>
+  <div id="summary">加载中…</div>
+  <table id="t">
+    <thead><tr><th>Slug</th><th>Stack</th><th>Tests</th><th>AGENTS.md</th><th>Git</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p style="margin-top:2rem;color:#888;font-size:.85rem">
+    这是 fallback 页面（web/dist 未构建）。运行 <code>make web-build</code> 后嵌入完整 Vue 看板。
+  </p>
+  <script>
+    fetch('/api/projects').then(r=>r.json()).then(d=>{
+      document.getElementById('summary').textContent =
+        '共 '+d.projects.length+' 个项目 · '+Object.entries(d.stack_summary).map(([k,v])=>k+'='+v).join(' ');
+      const tb=document.querySelector('#t tbody');
+      d.projects.forEach(p=>{
+        const tr=document.createElement('tr');
+        const git=(p.git_branch||'-')+(p.git_dirty?'*':'');
+        // 用 textContent 逐 cell 构造，避免 slug/branch 含 HTML 字符导致 XSS
+        const cells=[p.slug, (p.stack_primary||'-'), (p.test_count||'0'),
+                     (p.has_agents_md?'✓':'✗'), git];
+        const cls=['', '', '', (p.has_agents_md?'yes':'no'), ''];
+        cells.forEach((c,i)=>{
+          const td=document.createElement('td');
+          td.textContent=c;
+          if(cls[i]) td.className=cls[i];
+          tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+      });
+    }).catch(e=>document.getElementById('summary').textContent='加载失败: '+e);
+  </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# 示例 4：retry + dead_letter（错误恢复演示）
+# source 读取 → transform 可能失败（配置 retry 重试）→ sink 写入
+# 若 transform 重试后仍失败，dead_letter 把输入行写到死信 CSV，管道不中断。
+name: retry-deadletter
+steps:
+  - id: read
+    type: source
+    connector: csv
+    config:
+      path: "examples/data/input.csv"
+  - id: risky
+    type: transform
+    connector: filter
+    config:
+      where: "amount > 30"
+    depends_on: [read]
+    retry: 2              # 失败重试 2 次（共 3 次尝试）
+    dead_letter:          # 重试仍失败时，把输入行写入死信文件
+      connector: csv
+      config:
+        path: "examples/data/dead_letter.csv"
+  - id: write
+    type: sink
+    connector: stdout
+    config:
+      format: json
+    depends_on: [risky]

@@ -1,0 +1,18 @@
+# 构建产物
+bin/
+dist/
+internal/web/dist/*
+!internal/web/dist/.gitkeep
+
+# 数据库（运行时生成）
+*.db
+*.db-wal
+*.db-shm
+
+# 依赖
+web/node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
