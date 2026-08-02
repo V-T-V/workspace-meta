@@ -158,6 +158,204 @@ func TestLogTruncateEdgeCases(t *testing.T) {
 	})
 }
 
+// TestLogCompact 验证日志压缩（snapshot 简化版）的核心语义。
+func TestLogCompact(t *testing.T) {
+	var l Log
+	// 写 5 条：term=i, command=字母 a..e，Index=1..5。
+	for i := 0; i < 5; i++ {
+		l.Append(uint64(i+1), string(rune('a'+i)))
+	}
+	// Compact(2)：保留最后 2 条（d@4, e@5），丢弃前 3 条。
+	dropped := l.Compact(2)
+	if dropped != 3 {
+		t.Fatalf("应丢弃 3 条，实际 %d", dropped)
+	}
+	if l.Length() != 2 {
+		t.Errorf("压缩后 Length 应为 2，实际 %d", l.Length())
+	}
+	if l.BaseIndex != 3 {
+		t.Errorf("压缩后 BaseIndex 应为 3，实际 %d", l.BaseIndex)
+	}
+	if l.BaseTerm != 3 { // 被丢弃的最后一条是 c@3，其 Term=3
+		t.Errorf("压缩后 BaseTerm 应为 3（c 的 Term），实际 %d", l.BaseTerm)
+	}
+	// 逻辑 LastIndex 不变（仍为 5）。
+	if l.LastIndex() != 5 {
+		t.Errorf("压缩后 LastIndex 应仍为 5，实际 %d", l.LastIndex())
+	}
+	// 被压缩条目取不到，保留条目仍可取且 Index 不变。
+	if _, ok := l.At(1); ok {
+		t.Error("At(1) 应返回 false（已压缩）")
+	}
+	if e, ok := l.At(4); !ok || e.Command != "d" || e.Index != 4 {
+		t.Errorf("At(4) 应为 d/Index=4，实际 ok=%v %+v", ok, e)
+	}
+	if e, ok := l.At(5); !ok || e.Command != "e" || e.Index != 5 {
+		t.Errorf("At(5) 应为 e/Index=5，实际 ok=%v %+v", ok, e)
+	}
+}
+
+// TestLogCompactEdgeCases 验证 Compact 的边界。
+func TestLogCompactEdgeCases(t *testing.T) {
+	t.Run("keepLast >= len 无操作", func(t *testing.T) {
+		var l Log
+		l.Append(1, "a")
+		l.Append(1, "b")
+		if d := l.Compact(5); d != 0 {
+			t.Errorf("keepLast(5)>=len(2) 应丢弃 0，实际 %d", d)
+		}
+		if l.Length() != 2 || l.BaseIndex != 0 {
+			t.Errorf("无操作压缩后应保持 Length=2 BaseIndex=0")
+		}
+	})
+	t.Run("keepLast=0 丢弃全部", func(t *testing.T) {
+		var l Log
+		l.Append(1, "a")
+		l.Append(2, "b")
+		if d := l.Compact(0); d != 2 {
+			t.Errorf("keepLast(0) 应丢弃 2，实际 %d", d)
+		}
+		if l.Length() != 0 {
+			t.Errorf("keepLast(0) 后 Length 应为 0，实际 %d", l.Length())
+		}
+		if l.BaseIndex != 2 {
+			t.Errorf("keepLast(0) 后 BaseIndex 应为 2，实际 %d", l.BaseIndex)
+		}
+		if l.BaseTerm != 2 { // b 的 Term
+			t.Errorf("keepLast(0) 后 BaseTerm 应为 2，实际 %d", l.BaseTerm)
+		}
+		// 逻辑 LastIndex 跟随 BaseIndex（空日志返回 BaseIndex）。
+		if l.LastIndex() != 2 {
+			t.Errorf("全压缩后 LastIndex 应为 BaseIndex=2，实际 %d", l.LastIndex())
+		}
+	})
+	t.Run("keepLast 负数按 0 处理", func(t *testing.T) {
+		var l Log
+		l.Append(1, "a")
+		if d := l.Compact(-1); d != 1 {
+			t.Errorf("keepLast(-1) 应按 0 处理丢弃 1，实际 %d", d)
+		}
+	})
+	t.Run("多次压缩累加 BaseIndex", func(t *testing.T) {
+		var l Log
+		for i := 0; i < 6; i++ {
+			l.Append(uint64(i+1), string(rune('a'+i)))
+		}
+		l.Compact(4) // 丢弃 a,b → BaseIndex=2, BaseTerm=2
+		if l.BaseIndex != 2 {
+			t.Fatalf("第一次压缩后 BaseIndex 应为 2，实际 %d", l.BaseIndex)
+		}
+		l.Compact(1) // 保留最后 1 条，再丢弃 3 条 → BaseIndex=5, BaseTerm=5
+		if l.BaseIndex != 5 {
+			t.Errorf("第二次压缩后 BaseIndex 应为 5，实际 %d", l.BaseIndex)
+		}
+		if l.BaseTerm != 5 {
+			t.Errorf("第二次压缩后 BaseTerm 应为 5（e 的 Term），实际 %d", l.BaseTerm)
+		}
+		if l.Length() != 1 || l.LastIndex() != 6 {
+			t.Errorf("两次压缩后应 Length=1 LastIndex=6，实际 Length=%d LastIndex=%d",
+				l.Length(), l.LastIndex())
+		}
+	})
+}
+
+// TestLogCompactThenAppend 继续追加的 Index 连续性。
+func TestLogCompactThenAppend(t *testing.T) {
+	var l Log
+	for i := 0; i < 5; i++ {
+		l.Append(uint64(i+1), string(rune('a'+i)))
+	}
+	l.Compact(2) // 保留 d@4,e@5
+	// 再 Append 应得 Index=6。
+	idx := l.Append(6, "f")
+	if idx != 6 {
+		t.Errorf("压缩后 Append 应返回 6，实际 %d", idx)
+	}
+	e, ok := l.At(6)
+	if !ok || e.Command != "f" || e.Term != 6 || e.Index != 6 {
+		t.Errorf("At(6) 应为 f/Term=6/Index=6，实际 ok=%v %+v", ok, e)
+	}
+}
+
+// TestLogTermAt 验证 TermAt 在压缩边界与非边界的返回值。
+func TestLogTermAt(t *testing.T) {
+	var l Log
+	// term 序列：Index 1..5 → Term 1,1,2,2,2
+	l.Append(1, "a")
+	l.Append(1, "b")
+	l.Append(2, "c")
+	l.Append(2, "d")
+	l.Append(2, "e")
+
+	// 未压缩时。
+	if got := l.TermAt(0); got != 0 {
+		t.Errorf("TermAt(0) 应为 0，实际 %d", got)
+	}
+	if got := l.TermAt(3); got != 2 {
+		t.Errorf("TermAt(3) 应为 2，实际 %d", got)
+	}
+	if got := l.TermAt(5); got != 2 {
+		t.Errorf("TermAt(5) 应为 2，实际 %d", got)
+	}
+	if got := l.TermAt(6); got != 0 { // 越界
+		t.Errorf("TermAt(6) 越界应为 0，实际 %d", got)
+	}
+
+	// 压缩：保留最后 2 条（d@4,e@5），丢弃 a,b,c。BaseIndex=3, BaseTerm=2（c 的 Term）。
+	l.Compact(2)
+	if l.BaseIndex != 3 || l.BaseTerm != 2 {
+		t.Fatalf("压缩后 BaseIndex/BaseTerm 应为 3/2，实际 %d/%d", l.BaseIndex, l.BaseTerm)
+	}
+	// TermAt(BaseIndex) 应返回压缩时记录的 BaseTerm。
+	if got := l.TermAt(3); got != 2 {
+		t.Errorf("TermAt(BaseIndex=3) 应返回 BaseTerm=2，实际 %d", got)
+	}
+	// 保留区间正常。
+	if got := l.TermAt(4); got != 2 {
+		t.Errorf("TermAt(4) 应为 2，实际 %d", got)
+	}
+	// 已压缩区间内部（1,2）无法提供 Term → 0。
+	if got := l.TermAt(1); got != 0 {
+		t.Errorf("TermAt(1) 已压缩内部应为 0，实际 %d", got)
+	}
+	if got := l.TermAt(2); got != 0 {
+		t.Errorf("TermAt(2) 已压缩内部应为 0，实际 %d", got)
+	}
+}
+
+// TestLogLength 验证 Length 与压缩的关系。
+func TestLogLength(t *testing.T) {
+	var l Log
+	if l.Length() != 0 {
+		t.Errorf("空日志 Length 应为 0，实际 %d", l.Length())
+	}
+	for i := 0; i < 5; i++ {
+		l.Append(1, "x")
+	}
+	if l.Length() != 5 {
+		t.Errorf("5 条后 Length 应为 5，实际 %d", l.Length())
+	}
+	l.Compact(2)
+	if l.Length() != 2 {
+		t.Errorf("压缩保留 2 后 Length 应为 2，实际 %d", l.Length())
+	}
+}
+
+// TestLogEmptyAfterCompactLastIndex 验证全压缩后空日志的 LastIndex 返回 BaseIndex。
+func TestLogEmptyAfterCompactLastIndex(t *testing.T) {
+	var l Log
+	l.Append(1, "a")
+	l.Append(1, "b")
+	l.Compact(0) // 全压缩，BaseIndex=2
+	// 空日志 LastIndex 返回 BaseIndex（表达"最后一条已压缩条目的 Index"）。
+	if l.LastIndex() != 2 {
+		t.Errorf("全压缩后空日志 LastIndex 应为 BaseIndex=2，实际 %d", l.LastIndex())
+	}
+	if l.Length() != 0 {
+		t.Errorf("全压缩后 Length 应为 0，实际 %d", l.Length())
+	}
+}
+
 // TestLogSlice 验证范围查询，含 start>end 返回 nil。
 func TestLogSlice(t *testing.T) {
 	var l Log
