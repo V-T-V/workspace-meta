@@ -692,6 +692,70 @@ func TestJoin(t *testing.T) {
 	}
 }
 
+func TestSplit(t *testing.T) {
+	// 基本分割：逗号分隔
+	src := `let parts = split("a,b,c", ",");
+	return parts[0] + parts[1] + parts[2];`
+	if got := runString(t, src); got != "abc" {
+		t.Errorf(`split("a,b,c",",") 元素拼接应 "abc"，实际 %q`, got)
+	}
+
+	// 通过长度验证分割数量
+	if got := runInt(t, `let p = split("a,b,c", ","); return len(p);`); got != 3 {
+		t.Errorf(`len(split("a,b,c",",")) 应 3，实际 %d`, got)
+	}
+
+	// 多字符分隔符
+	if got := runInt(t, `let p = split("a::b::c", "::"); return len(p);`); got != 3 {
+		t.Errorf(`len(split("a::b::c","::")) 应 3，实际 %d`, got)
+	}
+
+	// 分隔符不出现：返回单元素数组（原串）
+	if got := runInt(t, `let p = split("abc", ","); return len(p);`); got != 1 {
+		t.Errorf(`len(split("abc",",")) 应 1，实际 %d`, got)
+	}
+
+	// 空分隔符：按字符拆分（strings.Split 语义：每个 rune 一段）
+	if got := runString(t, `let p = split("ab", ""); return p[0];`); got != "a" {
+		t.Errorf(`split("ab","")[0] 应 "a"，实际 %q`, got)
+	}
+
+	// 空字符串 + 非空分隔符：strings.Split 返回 [""]（长度 1）
+	if got := runInt(t, `let p = split("", ","); return len(p);`); got != 1 {
+		t.Errorf(`len(split("",",")) 应 1，实际 %d`, got)
+	}
+
+	// 中文按字符拆分
+	srcCN := `let parts = split("你好世界", "");
+	return parts[1];`
+	if got := runString(t, srcCN); got != "好" {
+		t.Errorf(`split("你好世界","")[1] 应 "好"，实际 %q`, got)
+	}
+
+	// 与 join 互为逆操作：join(split(s, sep), sep) == s
+	srcRound := `let s = "one-two-three";
+let p = split(s, "-");
+return join(p, "-");`
+	if got := runString(t, srcRound); got != "one-two-three" {
+		t.Errorf(`join(split(s,"-"),"-") 应还原为原串，实际 %q`, got)
+	}
+}
+
+func TestSplitErrors(t *testing.T) {
+	// 第一个参数非字符串应报错
+	if _, err := run(t, `return split(123, ",");`); err == nil {
+		t.Error(`split(123,",") 第一个参数非字符串应报错`)
+	}
+	// 第二个参数非字符串应报错
+	if _, err := run(t, `return split("abc", 1);`); err == nil {
+		t.Error(`split("abc",1) 第二个参数非字符串应报错`)
+	}
+	// 参数数量不对：split 内置只在恰好 2 参时匹配，其余落到"未定义函数"分支报错
+	if _, err := run(t, `return split("abc");`); err == nil {
+		t.Error(`split("abc") 参数不足应报错`)
+	}
+}
+
 func TestJoinErrors(t *testing.T) {
 	// 第一个参数非数组应报错
 	if _, err := run(t, `return join("abc", ",");`); err == nil {

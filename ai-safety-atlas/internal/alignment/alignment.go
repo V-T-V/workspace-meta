@@ -10,6 +10,7 @@ package alignment
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/QiuShichang/ai-safety-atlas/internal/detector"
 	"github.com/QiuShichang/ai-safety-atlas/internal/redteam"
@@ -146,4 +147,53 @@ func SeverityDistribution(detections []types.Detection) map[types.Severity]int {
 		out[d.Severity]++
 	}
 	return out
+}
+
+// LatencySummary 是一批检测耗时的统计摘要（单位：time.Duration）。
+//
+// 用于在批量 Evaluate/Analyze 之后刻画"检测器跑这一批用了多久"：
+//   - Count：检测次数（= 输入条数）
+//   - Total：累计耗时（决定吞吐的 1/Total*count）
+//   - Avg：单条平均耗时（最常用的性能指标）
+//   - Max/Min：最慢/最快一条，用于发现尾延迟和异常快路径
+type LatencySummary struct {
+	Count int
+	Total time.Duration
+	Avg   time.Duration
+	Max   time.Duration
+	Min   time.Duration
+}
+
+// LatencyStats 模拟批量检测的耗时统计：对每个输入跑一次 det.Analyze 并计时，
+// 汇总成 LatencySummary。
+//
+// 设计取舍：
+//   - 真正计时而非注入假数据：这样数值反映实际规则集在当前机器上的性能，
+//     能直接用作性能回归基线（CI 里跑超时即可发现退化）。
+//   - 空/nil 输入返回零值 LatencySummary（Count=0、各 Duration=0），不 panic、
+//     不除零；调用方可安全地把它格式化进报告。
+//   - Max/Min 仅在 Count>0 时有意义；Count==0 时保持为 0。
+//   - 不计入 redteam 用例，由调用方提供输入切片（与 FalsePositiveRate 同款入参，
+//     便于复用同一批文本做"准确性 + 性能"双重回归）。
+func LatencyStats(det *detector.Detector, inputs []string) LatencySummary {
+	if len(inputs) == 0 {
+		return LatencySummary{}
+	}
+	var s LatencySummary
+	s.Count = len(inputs)
+	s.Min = time.Duration(1<<63 - 1) // math.MaxInt64；任意实测都会更小
+	for _, in := range inputs {
+		start := time.Now()
+		_ = det.Analyze(in)
+		d := time.Since(start)
+		s.Total += d
+		if d > s.Max {
+			s.Max = d
+		}
+		if d < s.Min {
+			s.Min = d
+		}
+	}
+	s.Avg = s.Total / time.Duration(s.Count)
+	return s
 }

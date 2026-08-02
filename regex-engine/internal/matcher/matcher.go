@@ -587,6 +587,46 @@ func MustMatchString(pattern, text string) bool {
 	return m.Match(text)
 }
 
+// HasPrefix 报告 text 是否以 prefix 开头。
+//
+// 实现：把 prefix 用 Quote 转义（保证其中的正则元字符当字面量），
+// 再加 '^' 锚定到串首，用 IsFullMatch 判断从开头是否匹配。
+// 等价于标准库 strings.HasPrefix，但复用本引擎的 NFA 路径，
+// 也让"前缀含正则元字符"的场景能被一致处理（元字符按字面量对待）。
+//
+// 一次性调用：内部会编译一次 NFA。若要对同一 prefix 检查大量 text，
+// 应先 Compile("^" + Quote(prefix)) 复用 Matcher。
+//
+//	prefix 中的 '\n'：本引擎 ^ 认 '\n' 后为行首（多行语义），
+//	但配合 IsFullMatch 要求"整段匹配"，所以前缀若跨行仍按字面字符比对。
+func HasPrefix(text, prefix string) bool {
+	m, err := Compile("^" + Quote(prefix))
+	if err != nil {
+		// Quote 已转义所有元字符，'+' 前缀的 '^' 合法，
+		// 编译失败理论上不可达。失败时保守返回 false。
+		return false
+	}
+	return m.IsFullMatch(text)
+}
+
+// HasSuffix 报告 text 是否以 suffix 结尾。
+//
+// 实现：把 suffix 用 Quote 转义（保证其中的正则元字符当字面量），
+// 再加 '$' 锚定到串尾，用 IsFullMatch 判断整段是否匹配。
+// 等价于标准库 strings.HasSuffix，但复用本引擎的 NFA 路径。
+//
+//	suffix 中的 '\n'：本引擎 $ 在 pos==len(runes) 或当前字符为 '\n' 时成立，
+//	配合 IsFullMatch 的"整段匹配"约束，按字面字符比对，与 strings.HasSuffix 一致。
+//
+// 一次性调用语义同 HasPrefix：高频调用应预编译。
+func HasSuffix(text, suffix string) bool {
+	m, err := Compile(Quote(suffix) + "$")
+	if err != nil {
+		return false
+	}
+	return m.IsFullMatch(text)
+}
+
 // metaChars 是本引擎识别的正则元字符。Quote 会在它们前面加反斜杠转义。
 // 与 Go 标准库 regexp.QuoteMeta 的字符集保持一致。
 const metaChars = `\.+*?()|[]{}^$`

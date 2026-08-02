@@ -41,6 +41,40 @@ func FilterByLabel(points []types.MetricPoint, key, value string) []types.Metric
 	return out
 }
 
+// ExtractLabels 收集所有 metric 点在某标签键下的不同值（去重）。
+//
+// 遍历 points，把每个点 Labels[key] 的值收集起来，去重后按升序返回。
+// 典型用途：拿一批点先列出"当前有哪些 service / endpoint"，再做下钻分析。
+//
+// 行为约定（与 FilterByLabel 对齐，便于组合使用）：
+//   - key 为空 → 返回 nil（避免"空键命中所有点"的歧义）。
+//   - 点的 Labels 为 nil 或不含该 key → 跳过该点（不报错）。
+//   - 去重 + 字母序升序：输出确定性，可直接用于断言/表头渲染。
+//   - 不修改入参切片与各点的 Labels map。
+func ExtractLabels(points []types.MetricPoint, key string) []string {
+	if key == "" {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(points))
+	for _, p := range points {
+		if p.Labels == nil {
+			continue
+		}
+		if v, ok := p.Labels[key]; ok {
+			seen[v] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(seen))
+	for v := range seen {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // SumByName 按名称求和（跨所有标签组合）。
 //
 // 把所有 Name == name 的点的 Value 累加。无匹配返回 0。

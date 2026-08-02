@@ -566,6 +566,33 @@ func (itp *Interpreter) evalCall(e *core.CallExpr, env *Environment) (any, error
 		}
 		return strings.Join(parts, sepStr), nil
 	}
+	// 内置函数 split(str, sep)：按分隔符分割字符串，返回字符串数组。
+	// 是 join 的逆操作：split("a,b,c", ",") → ["a","b","c"]。
+	// 注意：Go 的 strings.Split("","x") 返回 [""]（长度 1），保持该语义不变。
+	if e.Callee == "split" && len(e.Args) == 2 {
+		s, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		sep, err := itp.evalExpr(e.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		str, ok := s.(string)
+		if !ok {
+			return nil, core.NewError(e.Loc, "split() 第一个参数必须是字符串，实际 %s", typeName(s))
+		}
+		sepStr, ok := sep.(string)
+		if !ok {
+			return nil, core.NewError(e.Loc, "split() 第二个参数必须是字符串，实际 %s", typeName(sep))
+		}
+		parts := strings.Split(str, sepStr)
+		out := make([]any, len(parts))
+		for i, p := range parts {
+			out[i] = p
+		}
+		return out, nil
+	}
 	// 内置函数 charAt(str, index)：返回指定位置的单字符字符串
 	if e.Callee == "charAt" && len(e.Args) == 2 {
 		s, err := itp.evalExpr(e.Args[0], env)

@@ -343,3 +343,101 @@ func TestPercentileEmpty(t *testing.T) {
 		t.Errorf("空 histogram 应返回 0，实际 %v", got)
 	}
 }
+
+// ===== ExtractLabels =====
+
+func TestExtractLabelsMethod(t *testing.T) {
+	pts := mkPoints()
+	// method 标签有 GET/POST 两种不同值，去重后升序。
+	got := ExtractLabels(pts, "method")
+	want := []string{"GET", "POST"}
+	if len(got) != len(want) {
+		t.Fatalf("method 应有 %d 个不同值，实际 %d（%v）", len(want), len(got), got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("位置 %d 应为 %s，实际 %s（全量 %v）", i, w, got[i], got)
+		}
+	}
+}
+
+func TestExtractLabelsHost(t *testing.T) {
+	pts := mkPoints()
+	// host 标签有 a/b 两种值。
+	got := ExtractLabels(pts, "host")
+	if len(got) != 2 {
+		t.Fatalf("host 应有 2 个不同值，实际 %d（%v）", len(got), got)
+	}
+	// 升序：a 在 b 前。
+	if got[0] != "a" || got[1] != "b" {
+		t.Errorf("host 升序应为 [a b]，实际 %v", got)
+	}
+}
+
+func TestExtractLabelsSortedAsc(t *testing.T) {
+	// 构造一组乱序标签值，验证返回是字母序升序且确定。
+	pts := []types.MetricPoint{
+		{Labels: map[string]string{"k": "zeta"}},
+		{Labels: map[string]string{"k": "alpha"}},
+		{Labels: map[string]string{"k": "mid"}},
+		{Labels: map[string]string{"k": "alpha"}}, // 重复
+	}
+	got := ExtractLabels(pts, "k")
+	want := []string{"alpha", "mid", "zeta"}
+	if len(got) != len(want) {
+		t.Fatalf("应有 %d 个去重值，实际 %d（%v）", len(want), len(got), got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("升序位置 %d 应为 %s，实际 %s（全量 %v）", i, w, got[i], got)
+		}
+	}
+}
+
+func TestExtractLabelsNoMatch(t *testing.T) {
+	// 没有任何点含该 key → 返回 nil。
+	if got := ExtractLabels(mkPoints(), "nonexistent"); got != nil {
+		t.Errorf("无匹配 key 应返回 nil，实际 %v", got)
+	}
+}
+
+func TestExtractLabelsEmptyKey(t *testing.T) {
+	// 空 key 返回 nil（不命中所有点）。
+	if got := ExtractLabels(mkPoints(), ""); got != nil {
+		t.Errorf("空 key 应返回 nil，实际 %v", got)
+	}
+}
+
+func TestExtractLabelsEmptyInput(t *testing.T) {
+	// 空入参返回 nil（无点可提取）。
+	if got := ExtractLabels(nil, "method"); got != nil {
+		t.Errorf("空入参应返回 nil，实际 %v", got)
+	}
+}
+
+func TestExtractLabelsNilLabelsSkipped(t *testing.T) {
+	// Labels 为 nil 的点应被跳过，不 panic。
+	pts := []types.MetricPoint{
+		{Labels: nil},
+		{Labels: map[string]string{"k": "v1"}},
+		{Labels: nil},
+		{Labels: map[string]string{"k": "v2"}},
+	}
+	got := ExtractLabels(pts, "k")
+	if len(got) != 2 {
+		t.Errorf("应跳过 nil labels 后剩 2 个值，实际 %d（%v）", len(got), got)
+	}
+}
+
+func TestExtractLabelsDoesNotMutateInput(t *testing.T) {
+	pts := mkPoints()
+	origLen := len(pts)
+	_ = ExtractLabels(pts, "method")
+	if len(pts) != origLen {
+		t.Error("ExtractLabels 不应修改入参切片长度")
+	}
+	// 标签 map 不应被破坏：method=GET 仍可取到。
+	if pts[0].Labels["method"] != "GET" {
+		t.Error("ExtractLabels 不应破坏入参的 Labels map")
+	}
+}

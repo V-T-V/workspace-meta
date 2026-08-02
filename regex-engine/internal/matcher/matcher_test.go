@@ -1,6 +1,7 @@
 package matcher
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/QiuShichang/regex-engine/internal/nfa"
@@ -1005,4 +1006,129 @@ func equalSlices(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// TestQuote 验证 Quote 把正则元字符转义，产出的 pattern 能匹配原始字面量字符串。
+func TestQuote(t *testing.T) {
+	// 单字符元字符转义表
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{`.`, `\.`},
+		{`*`, `\*`},
+		{`+`, `\+`},
+		{`?`, `\?`},
+		{`(`, `\(`},
+		{`)`, `\)`},
+		{`[`, `\[`},
+		{`]`, `\]`},
+		{`{`, `\{`},
+		{`}`, `\}`},
+		{`|`, `\|`},
+		{`\`, `\\`},
+		{`^`, `\^`},
+		{`$`, `\$`},
+	}
+	for _, c := range cases {
+		if got := Quote(c.in); got != c.want {
+			t.Errorf("Quote(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+
+	// 无元字符的字符串原样返回
+	if got := Quote("plain"); got != "plain" {
+		t.Errorf("Quote(\"plain\") 应原样返回，实际 %q", got)
+	}
+	// 空串原样返回
+	if got := Quote(""); got != "" {
+		t.Errorf("Quote(\"\") 应为空串，实际 %q", got)
+	}
+	// 混合串：元字符转义、普通字符不动
+	if got := Quote("1+1=2"); got != `1\+1=2` {
+		t.Errorf(`Quote("1+1=2") = %q, want "1\+1=2"`, got)
+	}
+	if got := Quote("(a)b"); got != `\(a\)b` {
+		t.Errorf(`Quote("(a)b") = %q, want "\(a\)b"`, got)
+	}
+	if got := Quote(`a\b`); got != `a\\b` {
+		t.Errorf("Quote(%q) = %q, want %q", `a\b`, got, `a\\b`)
+	}
+	// 全元字符串：每个字符都被转义
+	if got := Quote(".*+"); got != `\.\*\+` {
+		t.Errorf(`Quote(".*+") = %q, want "\.\*\+"`, got)
+	}
+}
+
+// TestQuoteNonASCIIPassthrough 非 ASCII 字符（rune>=128）不可能是 ASCII 元字符，原样透传。
+func TestQuoteNonASCIIPassthrough(t *testing.T) {
+	for _, s := range []string{"你好", "café", "日本語", "αβγ"} {
+		if got := Quote(s); got != s {
+			t.Errorf("Quote(%q) 非 ASCII 应原样返回，实际 %q", s, got)
+		}
+	}
+}
+
+// TestQuoteMatchesLiteral 是 Quote 正确性的最终检验：
+// Quote(s) 作为 pattern 编译后，必须匹配字面量 s 本身。
+func TestQuoteMatchesLiteral(t *testing.T) {
+	for _, s := range []string{
+		"1+1=2",
+		"(a|b)*",
+		"price: $9.99",
+		"{key}",
+		`path\to\file`,
+		"[a-z]+",
+		"^start$",
+		"100%",
+		"hello world",
+	} {
+		quoted := Quote(s)
+		m, err := Compile(quoted)
+		if err != nil {
+			t.Fatalf("Compile(Quote(%q)=%q) 失败: %v", s, quoted, err)
+		}
+		if !m.Match(s) {
+			t.Errorf("Quote(%q) → %q 编译后应匹配原串 %q", s, quoted, s)
+		}
+	}
+}
+
+// TestQuoteDistinguishesFromRaw 验证 Quote 抵消元字符语义：
+// 未转义的 "a.c" 会匹配 "axc"，Quote("a.c") 编译后只匹配字面量 "a.c"。
+func TestQuoteDistinguishesFromRaw(t *testing.T) {
+	raw, _ := Compile("a.c")
+	if !raw.Match("axc") {
+		t.Fatal("a.c 本应匹配 axc（点号通配）")
+	}
+	// Quote("a.c") 应只匹配字面 "a.c"
+	qm, err := Compile(Quote("a.c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qm.Match("axc") {
+		t.Errorf(`Quote("a.c") 不应匹配 "axc"（点号已被转义）`)
+	}
+	if !qm.Match("a.c") {
+		t.Errorf(`Quote("a.c") 应匹配字面量 "a.c"`)
+	}
+}
+
+// TestQuoteMatchesStdLib 与 Go 标准库 regexp.QuoteMeta 对照（同字符集，结果应一致）。
+func TestQuoteMatchesStdLib(t *testing.T) {
+	inputs := []string{
+		"", "plain", "1+1=2", "(a|b)*", ".*+?[]{}()|^$\\",
+		"café", "你好.*", "100%", `C:\Windows`,
+	}
+	for _, in := range inputs {
+		want := stdQuoteMeta(in)
+		if got := Quote(in); got != want {
+			t.Errorf("Quote(%q) = %q，与标准库 QuoteMeta %q 不一致", in, got, want)
+		}
+	}
+}
+
+// stdQuoteMeta 是 regexp.QuoteMeta 的标准库调用，用于交叉验证 Quote 的字符集与实现。
+func stdQuoteMeta(s string) string {
+	return regexp.QuoteMeta(s)
 }
