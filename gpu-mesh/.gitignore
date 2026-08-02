@@ -1,0 +1,24 @@
+# 构建产物
+bin/
+dist/
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 运行时数据（不应入库）
+*.db
+gpu-mesh.db
+audit.jsonl
+ca-state.json
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

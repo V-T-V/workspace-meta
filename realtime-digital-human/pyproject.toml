@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "realtime-digital-human"
+version = "0.1.0"
+description = "单机实时数字人服务——ASR→LLM→TTS→唇形 流式管线重叠，首响应 <1.5s"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Private" }
+authors = [{ name = "M_X_M" }]
+keywords = ["digital-human", "realtime", "asr", "tts", "lip-sync", "pipeline"]
+# 核心层依赖：仅 Web 框架 + 配置 + 异步 HTTP + 音频解码。
+# 重模型（whisper/torch/musetalk）放 optional-dependencies，缺失时优雅降级或提示。
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pyyaml>=6.0",
+    "aiohttp>=3.9",
+    "websockets>=12.0",
+    "miniaudio>=1.59",   # edge-tts MP3→PCM16 解码（核心链路，非可选）
+]
+
+[project.optional-dependencies]
+# ASR：faster-whisper（含 torch 依赖，较重）
+asr = ["faster-whisper>=1.0", "numpy>=1.26"]
+# TTS 默认实现：edge-tts（在线，零显存）
+tts-edge = ["edge-tts>=6.1"]
+# TTS 可选实现：CosyVoice（本地，可克隆音色，重度依赖，需手动安装）
+tts-cosyvoice = []
+# 唇形：MuseTalk（重度依赖，需手动安装；opencv 用于占位渲染 + MuseTalk 图像处理）
+lipsync = ["opencv-python>=4.8", "numpy>=1.26"]
+# 开发工具
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4", "httpx>=0.27"]
+
+[project.urls]
+Homepage = "https://example.local/realtime-digital-human"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["digitalhuman*"]
+exclude = ["tests*", "web*", "docs*", "scripts*", "assets*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# 启用 Pyflakes（F）：未使用 import/变量/未定义名字
+select = ["F"]
+# 忽略 __init__.py 的未使用 import（可能是公开 API）
+ignore = ["F401"]

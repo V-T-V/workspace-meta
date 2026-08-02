@@ -1,0 +1,56 @@
+# gpu-mesh-relay systemd 服务单元
+#
+# 安装：
+#   sudo cp deploy/systemd/gpu-mesh-relay.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now gpu-mesh-relay
+#
+# 查看日志：
+#   journalctl -u gpu-mesh-relay -f
+#
+# 配置：编辑下方 Environment 项，至少改 RELAY_TOKEN
+# 二进制：默认 /usr/local/bin/gpu-mesh-relay（由 deploy/relay-init.sh 安装）
+
+[Unit]
+Description=GPU Mesh Relay - 异地分布式 GPU 算力调度中继
+Documentation=https://github.com/QiuShichang/gpu-mesh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gpu-mesh
+Group=gpu-mesh
+
+# 二进制与工作目录
+ExecStart=/usr/local/bin/gpu-mesh-relay \
+  -addr :7780 \
+  -store \
+  -store-path /var/lib/gpu-mesh/relay.db \
+  -audit /var/log/gpu-mesh/audit.jsonl
+WorkingDirectory=/var/lib/gpu-mesh
+
+# 环境变量配置（至少改 RELAY_TOKEN）
+Environment=GPU_MESH_TOKEN=CHANGE_ME_TO_STRONG_TOKEN
+
+# 生产加固：重启策略 + 资源限制
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+# 内存/CPU 限制（2核4G VPS 建议）
+MemoryMax=2G
+CPUQuota=200%
+
+# 安全沙箱
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/gpu-mesh /var/log/gpu-mesh
+
+# 优雅停止
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

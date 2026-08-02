@@ -1,0 +1,61 @@
+# gpu-mesh Relay docker-compose
+#
+# 启动：cd deploy/docker && docker compose up -d
+# 日志：docker compose logs -f
+# 停止：docker compose down
+#
+# 生产加固：把 GPU_MESH_TOKEN 放到 .env 文件（不入库）
+#   echo "GPU_MESH_TOKEN=$(openssl rand -hex 32)" > .env
+
+services:
+  relay:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    # 或用预构建镜像：
+    # image: gpumesh/relay:latest
+    container_name: gpu-mesh-relay
+    restart: unless-stopped
+    ports:
+      - "7780:7780"
+    environment:
+      - GPU_MESH_TOKEN=${GPU_MESH_TOKEN:-dev-token-change-me}
+    volumes:
+      - relay-data:/var/lib/gpu-mesh
+      - relay-logs:/var/log/gpu-mesh
+    # 资源限制（按 VPS 规格调）
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7780/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # 可选：Nginx 反代（TLS 终止）
+  # 实际生产建议 Nginx 跑在宿主机或单独容器配合 certbot
+  nginx:
+    image: nginx:alpine
+    container_name: gpu-mesh-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/gpu-mesh-nginx.conf:/etc/nginx/conf.d/gpu-mesh.conf:ro
+      - ./certs:/etc/letsencrypt:ro     # TLS 证书挂载
+    depends_on:
+      - relay
+    profiles: ["with-nginx"]    # docker compose --profile with-nginx up 启用
+
+volumes:
+  relay-data:
+  relay-logs:

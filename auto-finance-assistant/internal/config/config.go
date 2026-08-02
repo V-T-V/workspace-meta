@@ -37,7 +37,8 @@ type OllamaConfig struct {
 	ChatModel            string `yaml:"chat_model"`
 	EmbeddingModel       string `yaml:"embedding_model"`
 	RequestTimeoutSeconds int   `yaml:"request_timeout_seconds"`
-	KeepAlive            string `yaml:"keep_alive"`
+	KeepAlive             string `yaml:"keep_alive"`
+	ModelPath             string `yaml:"model_path"`
 }
 
 type GenerationConfig struct {
@@ -97,7 +98,8 @@ type BackupConfig struct {
 }
 
 type SecurityConfig struct {
-	AdminPassword string `yaml:"admin_password"`
+	AdminPassword  string   `yaml:"admin_password"`
+	ModelHash      string   `yaml:"model_hash"`
 }
 
 // RequestTimeout 返回 Ollama 请求超时。

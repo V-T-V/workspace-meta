@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0e1430" />
+    <meta
+      name="description"
+      content="前端工具箱 —— 40+ 个纯前端开发者日常工具：JSON 格式化、编码解码、加密 Hash、文本处理、图片压缩、二维码等，数据不离开浏览器。"
+    />
+    <title>前端工具箱 · Frontend Toolbox</title>
+    <link rel="stylesheet" href="/src/styles/themes.css" />
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- 外壳由 main.ts 动态挂载：顶栏 + 左侧导航 + 主工作区 -->
+      <div class="boot-loading">
+        <div class="boot-spinner" aria-hidden="true"></div>
+        <p>正在加载工具箱…</p>
+      </div>
+    </div>
+
+    <!-- 全局提示容器 -->
+    <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+    <noscript>
+      <div class="noscript-msg">
+        <p>前端工具箱需要启用 JavaScript 才能运行。</p>
+        <p>请在浏览器设置中开启 JavaScript 后刷新本页。</p>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

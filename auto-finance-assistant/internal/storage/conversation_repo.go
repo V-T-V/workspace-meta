@@ -172,3 +172,11 @@ func parseTime(raw string) time.Time {
 	}
 	return time.Time{}
 }
+
+// DeleteConversation 删除会话（messages 表 ON DELETE CASCADE 会自动删除关联消息）。
+func DeleteConversation(ctx context.Context, db *sql.DB, id string) error {
+	if _, err := db.ExecContext(ctx, `DELETE FROM conversations WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("[storage] 删除会话失败: %w", err)
+	}
+	return nil
+}

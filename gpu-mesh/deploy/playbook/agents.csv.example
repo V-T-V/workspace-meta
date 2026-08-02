@@ -1,0 +1,21 @@
+host,user,password,agent_id
+# GPU Mesh Agent 批量部署主机清单模板
+# 复制本文件为 agents.csv，填入实际信息后运行：
+#   .\batch-install-agent.ps1 -Csv agents.csv -Relay wss://gpu-mesh.yourdomain.com -Token xxx
+#
+# 字段说明：
+#   host      目标机器 IP 或主机名（需 WinRM 可达）
+#   user      管理员账户（如 administrator / admin）
+#   password  密码（明文，仅本机用，部署后可删 CSV）
+#   agent_id  Agent 唯一 ID（建议规范：gpu-<地域>-<编号>）
+
+# === 北京机房 ===
+192.168.1.101,administrator,P@ssw0rd,gpu-bj-001
+192.168.1.102,administrator,P@ssw0rd,gpu-bj-002
+
+# === 上海机房 ===
+10.0.0.51,admin,Sh@anghai2024,gpu-sh-014
+10.0.0.52,admin,Sh@anghai2024,gpu-sh-015
+
+# === 广州办公室 ===
+172.16.3.10,administrator,Gz#office1,gpu-gz-001

@@ -1,0 +1,29 @@
+server:
+  host: 127.0.0.1
+  port: 8099
+ollama:
+  backend: ollama
+  base_url: http://127.0.0.1:11434
+  chat_model: qwen2.5:1.5b
+  embedding_model: nomic-embed-text
+  request_timeout_seconds: 120
+generation:
+  num_thread: 8
+  context_size: 2048
+  max_output_tokens: 0
+  temperature: 0.7
+queue:
+  generation_concurrency: 1
+  maximum_waiting: 10
+  request_timeout_seconds: 120
+storage:
+  database_path: ./data/eval-test.db
+  document_path: ./data/documents
+  temp_path: ./data/temp
+  backup_path: ./data/backups
+logging:
+  level: warn
+  directory: ./data/logs
+  max_file_size_mb: 5
+  max_files: 2
+  retain_days: 7

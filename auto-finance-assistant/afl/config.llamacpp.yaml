@@ -1,0 +1,82 @@
+# llama.cpp 版配置模板（CPU 验证）
+# 使用 llama-server 替代 Ollama，资源占用更低、吞吐更高。
+#
+# 启动 llama-server：
+#   llama-server -m models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
+#     --port 8081 --host 127.0.0.1 -t 8 -c 4096 --mmap
+#
+# 向量模型需另起一个 llama-server 实例：
+#   llama-server -m models/nomic-embed-text-v1.5.Q8_0.gguf \
+#     --port 8082 --host 127.0.0.1 --embedding
+
+server:
+  host: 127.0.0.1
+  port: 8080
+  read_timeout_seconds: 30
+  write_timeout_seconds: 120
+
+ollama:
+  backend: llamacpp                    # 使用 llama.cpp 后端
+  base_url: http://127.0.0.1:8081/v1   # llama-server 的 OpenAI 端点
+  embedding_base_url: http://127.0.0.1:8082/v1 # 独立的向量 llama-server 端点
+  chat_model: qwen2.5-1.5b-instruct    # 任意名（llama-server 只加载一个模型）
+  embedding_model: nomic-embed-text    # 向量模型（如另起实例则指向 8082）
+  request_timeout_seconds: 180
+  keep_alive: 30m
+
+generation:
+  num_thread: 8
+  context_size: 4096
+  max_output_tokens: 400
+  temperature: 0.1
+  top_p: 0.9
+  top_k: 40
+  repeat_penalty: 1.1
+
+rag:
+  fts_limit: 20
+  vector_limit: 20
+  final_limit: 5
+  minimum_confidence: 0.40
+  high_confidence: 0.70
+  vector_weight: 0.65
+  keyword_weight: 0.35
+
+queue:
+  generation_concurrency: 1
+  maximum_waiting: 10
+  request_timeout_seconds: 180
+
+storage:
+  database_path: ./data/assistant.db
+  document_path: ./data/documents
+  temp_path: ./data/temp
+  backup_path: ./data/backups
+
+documents:
+  max_file_size_mb: 50
+  chunk_min_chars: 300
+  chunk_max_chars: 800
+  chunk_overlap_chars: 80
+  allowed_extensions:
+    - .txt
+    - .md
+    - .html
+    - .docx
+    - .xlsx
+    - .pdf
+
+logging:
+  level: info
+  directory: ./data/logs
+  max_file_size_mb: 20
+  max_files: 7
+  retain_days: 30
+
+backup:
+  enabled: false
+  schedule: "02:00"
+  retain_count: 7
+
+security:
+  admin_password: ""

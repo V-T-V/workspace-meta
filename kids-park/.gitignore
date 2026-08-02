@@ -1,0 +1,9 @@
+.godot/
+*.import
+build/
+*.keystore
+.DS_Store
+
+# Godot Android 模板（太大，不入库）
+android/templates/*.apk
+assets/models/*.glb

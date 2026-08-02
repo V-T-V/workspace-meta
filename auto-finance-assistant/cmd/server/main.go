@@ -136,7 +136,7 @@ func runForeground(configPath string, stopCh chan struct{}) {
 
 	// 11. HTTP 路由
 	mux := http.NewServeMux()
-	srv := api.New(chatSvc, oc, q, importer)
+	srv := api.New(chatSvc, oc, q, db, importer)
 	srv.SetVectorSearcher(vecSearcher)
 	if cfg.Security.AdminPassword != "" {
 		srv.SetAdminPassword(cfg.Security.AdminPassword)

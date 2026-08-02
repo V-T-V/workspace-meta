@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU Mesh · 算力调度平台</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #0f1419; color: #e6e6e6; min-height: 100vh;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a2332 0%, #0f1419 100%);
+    border-bottom: 1px solid #2a3441; padding: 20px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header h1 { font-size: 22px; font-weight: 600; color: #7ee787; letter-spacing: 0.5px; }
+  .header .sub { font-size: 13px; color: #8b949e; margin-top: 4px; }
+  .header .meta { text-align: right; font-size: 12px; color: #8b949e; }
+  .header .meta b { color: #79c0ff; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; padding: 24px 32px; }
+  .stat-card {
+    background: #161b22; border: 1px solid #2a3441; border-radius: 8px; padding: 18px 20px;
+  }
+  .stat-card .label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+  .stat-card .value.green { color: #7ee787; }
+  .stat-card .value.blue { color: #79c0ff; }
+  .stat-card .value.orange { color: #ffa657; }
+  .stat-card .value.red { color: #ff7b72; }
+  .stat-card .detail { font-size: 12px; color: #8b949e; margin-top: 4px; }
+
+  .section { padding: 0 32px 24px; }
+  .section h2 { font-size: 15px; font-weight: 600; color: #c9d1d9; margin-bottom: 12px; padding-top: 8px; }
+  table { width: 100%; border-collapse: collapse; background: #161b22; border-radius: 8px; overflow: hidden; }
+  th, td { padding: 12px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid #21262d; }
+  th { background: #1c2331; color: #8b949e; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1c2331; }
+  td.mono { font-family: "Cascadia Code", Consolas, monospace; }
+
+  .bar { width: 100px; height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; }
+  .bar-fill { height: 100%; transition: width 0.4s; }
+  .pct { font-size: 12px; color: #8b949e; margin-left: 6px; font-family: monospace; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge.idle { background: #1a3a2a; color: #7ee787; }
+  .badge.active { background: #3a2f1a; color: #ffa657; }
+  .badge.busy_human { background: #3a1a1f; color: #ff7b72; }
+  .badge.offline { background: #2a3441; color: #6e7681; }
+
+  .tag { display: inline-block; padding: 1px 6px; margin: 0 2px; background: #21262d; color: #8b949e; border-radius: 3px; font-size: 11px; font-family: monospace; }
+  .empty { text-align: center; padding: 60px 20px; color: #6e7681; }
+  .empty .hint { font-size: 13px; margin-top: 12px; line-height: 1.8; }
+  .empty code { background: #21262d; padding: 2px 6px; border-radius: 3px; color: #79c0ff; }
+
+  .conn-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .conn-status.ok { background: #7ee787; }
+  .conn-status.err { background: #ff7b72; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>⚡ GPU Mesh</h1>
+    <div class="sub">分布式 GPU 算力调度平台 · 异地 Windows 4060 集群</div>
+  </div>
+  <div class="meta">
+    <div><span class="conn-status" id="connDot"></span><span id="connText">连接中…</span></div>
+    <div style="margin-top:4px">在线 <b id="hdrOnline">0</b> · 累计 <b id="hdrSeen">0</b></div>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="label">在线 GPU 节点</div>
+    <div class="value green" id="kpiNodes">0</div>
+    <div class="detail" id="kpiNodesDetail">0 张 GPU</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">平均利用率</div>
+    <div class="value blue" id="kpiAvgUtil">0%</div>
+    <div class="detail" id="kpiUtilDetail">集群总算力使用情况</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">已用 / 总显存</div>
+    <div class="value orange" id="kpiVram">0 / 0 GB</div>
+    <div class="detail" id="kpiVramDetail">显存占用率 0%</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">让位状态分布</div>
+    <div class="value" id="kpiYield">—</div>
+    <div class="detail" id="kpiYieldDetail">IDLE / ACTIVE / BUSY</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>📋 节点详情（每台机器的 GPU 状态与让位情况）</h2>
+  <table id="agentTable">
+    <thead>
+      <tr>
+        <th>主机 / AgentID</th>
+        <th>GPU</th>
+        <th>利用率</th>
+        <th>显存</th>
+        <th>温度</th>
+        <th>功耗</th>
+        <th>引擎 / 模型</th>
+        <th>让位状态</th>
+        <th>在线时长</th>
+      </tr>
+    </thead>
+    <tbody id="agentBody">
+      <tr><td colspan="9" class="empty">等待 Agent 上线…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 32px 24px">
+  <!-- 推理测试面板 -->
+  <div class="section" style="padding:0">
+    <div style="padding:16px 20px 0"><h2>💬 推理测试（直接对话验证集群）</h2></div>
+    <div style="padding:12px 20px">
+      <select id="chatModel" style="background:#0d1117;border:1px solid #2a3441;color:#c9d1d9;padding:6px 8px;border-radius:4px;width:100%;margin-bottom:8px"></select>
+      <textarea id="chatInput" placeholder="输入问题，如：用一句话介绍 GPU Mesh" rows="2" style="background:#0d1117;border:1px solid #2a3441;color:#c9d1d9;padding:8px;border-radius:4px;width:100%;margin-bottom:8px;font-family:inherit"></textarea>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <label style="font-size:12px;color:#8b949e;display:flex;align-items:center;gap:4px"><input type="checkbox" id="chatStream"> 流式</label>
+        <label style="font-size:12px;color:#8b949e">max_tokens <input type="number" id="chatMaxTok" value="200" style="width:60px;background:#0d1117;border:1px solid #2a3441;color:#c9d1d9;border-radius:3px"></label>
+        <button onclick="doChat()" style="margin-left:auto;background:#238636;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-weight:600">发送</button>
+      </div>
+      <div id="chatOutput" style="background:#0d1117;border:1px solid #2a3441;border-radius:4px;padding:10px;min-height:60px;font-size:13px;line-height:1.6;white-space:pre-wrap">结果会显示在这里…</div>
+    </div>
+  </div>
+
+  <!-- 批量提交面板 -->
+  <div class="section" style="padding:0">
+    <div style="padding:16px 20px 0"><h2>📦 批量提交（Map-Reduce 并行处理）</h2></div>
+    <div style="padding:12px 20px">
+      <select id="batchModel" style="background:#0d1117;border:1px solid #2a3441;color:#c9d1d9;padding:6px 8px;border-radius:4px;width:100%;margin-bottom:8px"></select>
+      <textarea id="batchInput" placeholder="每行一条输入，如：&#10;1+1=?&#10;中国的首都是？&#10;水的化学式" rows="3" style="background:#0d1117;border:1px solid #2a3441;color:#c9d1d9;padding:8px;border-radius:4px;width:100%;margin-bottom:8px;font-family:inherit"></textarea>
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <label style="font-size:12px;color:#8b949e">分片大小 <input type="number" id="batchShard" value="20" style="width:60px;background:#0d1117;border:1px solid #2a3441;color:#c9d1d9;border-radius:3px"></label>
+        <button onclick="doBatch()" style="margin-left:auto;background:#1f6feb;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-weight:600">提交批量</button>
+      </div>
+      <div id="batchOutput" style="background:#0d1117;border:1px solid #2a3441;border-radius:4px;padding:10px;min-height:60px;font-size:12px;line-height:1.5">提交后会显示进度…</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>📊 系统指标</h2>
+  <div id="metricsPanel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;font-size:13px"></div>
+</div>
+
+<script>
+const token = new URLSearchParams(location.search).get('token') || '';
+function apiUrl(path) { return path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token); }
+
+let agents = [];
+let seen = 0;
+
+// === 轮询拉取（SSE 兜底用，确保即使 SSE 断开也有数据）===
+async function refresh() {
+  try {
+    const res = await fetch(apiUrl('/api/agents'));
+    const data = await res.json();
+    agents = data.agents || [];
+    seen = Math.max(seen, agents.length);
+    render();
+    refreshModels();
+    refreshMetrics();
+    setConn(true);
+  } catch (e) {
+    setConn(false);
+  }
+}
+
+// 拉取集群模型列表，填充推理/批量下拉
+async function refreshModels() {
+  try {
+    const res = await fetch(apiUrl('/v1/models'));
+    const data = await res.json();
+    const models = (data.data || []).map(m => m.id);
+    fillSelect('chatModel', models);
+    fillSelect('batchModel', models);
+  } catch (e) {}
+}
+
+function fillSelect(id, options) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const cur = sel.value;
+  if (sel.children.length === options.length && [...sel.children].every((o,i)=>o.value===options[i])) return;
+  sel.innerHTML = options.map(m => `<option value="${m}">${m}</option>`).join('');
+  if (cur && options.includes(cur)) sel.value = cur;
+}
+
+// 系统指标面板
+async function refreshMetrics() {
+  try {
+    const res = await fetch(apiUrl('/api/metrics'));
+    const m = await res.json();
+    const items = [
+      ['在线节点', m.agents_online, '#7ee787'],
+      ['推理总数', m.inference_total, '#79c0ff'],
+      ['推理成功', m.inference_success, '#7ee787'],
+      ['推理失败', m.inference_fail, m.inference_fail>0?'#ff7b72':'#8b949e'],
+      ['平均延迟', (m.inference_avg_ms||0)+'ms', '#ffa657'],
+      ['让位 NACK', m.yield_nacks, m.yield_nacks>0?'#ffa657':'#8b949e'],
+      ['批量作业', m.batch_jobs, '#79c0ff'],
+      ['事件丢弃', m.events_dropped, m.events_dropped>0?'#ff7b72':'#8b949e'],
+      ['Goroutines', m.goroutines, '#8b949e'],
+      ['运行时长', fmtUptime(m.uptime_seconds), '#8b949e'],
+    ];
+    document.getElementById('metricsPanel').innerHTML = items.map(([k,v,c]) =>
+      `<div style="background:#161b22;border:1px solid #2a3441;border-radius:6px;padding:10px 12px">
+        <div style="font-size:11px;color:#8b949e">${k}</div>
+        <div style="font-size:18px;font-weight:700;color:${c};margin-top:4px">${v}</div>
+      </div>`).join('');
+  } catch (e) {}
+}
+
+// 推理测试
+async function doChat() {
+  const model = document.getElementById('chatModel').value;
+  const input = document.getElementById('chatInput').value.trim();
+  const stream = document.getElementById('chatStream').checked;
+  const maxTok = parseInt(document.getElementById('chatMaxTok').value)||200;
+  if (!model || !input) return;
+  const out = document.getElementById('chatOutput');
+  out.textContent = '生成中…';
+  const t0 = performance.now();
+  try {
+    if (stream) {
+      out.textContent = '';
+      const res = await fetch(apiUrl('/v1/chat/completions'), {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({model, stream:true, max_tokens:maxTok, messages:[{role:'user',content:input}]})
+      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, {stream:true});
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            try { out.textContent += JSON.parse(line.slice(6)).choices[0].delta.content || ''; } catch(e){}
+          }
+        }
+      }
+    } else {
+      const res = await fetch(apiUrl('/v1/chat/completions'), {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({model, max_tokens:maxTok, messages:[{role:'user',content:input}]})
+      });
+      const data = await res.json();
+      out.textContent = data.choices ? data.choices[0].message.content : JSON.stringify(data);
+    }
+    out.textContent += `\n\n⏱ ${(performance.now()-t0).toFixed(0)}ms`;
+  } catch (e) {
+    out.textContent = '失败: ' + e.message;
+  }
+}
+
+// 批量提交
+async function doBatch() {
+  const model = document.getElementById('batchModel').value;
+  const text = document.getElementById('batchInput').value.trim();
+  const shard = parseInt(document.getElementById('batchShard').value)||20;
+  const out = document.getElementById('batchOutput');
+  if (!model || !text) return;
+  const items = text.split('\n').filter(x=>x.trim());
+  out.textContent = '提交中…';
+  try {
+    const res = await fetch(apiUrl('/api/batches'), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model, items, shard_size:shard, task_type:'chat', min_budget:10, max_tokens:100})
+    });
+    const data = await res.json();
+    const bid = data.batch_id;
+    out.textContent = `已提交 ${bid}（${items.length} 项 / ${Math.ceil(items.length/shard)} 分片），轮询进度…`;
+    // 轮询进度
+    for (let i=0;i<60;i++) {
+      await new Promise(r=>setTimeout(r, 3000));
+      const sr = await fetch(apiUrl('/api/batches/'+bid));
+      const st = await sr.json();
+      const pct = st.total ? Math.floor(st.completed/st.total*100) : 0;
+      out.innerHTML = `${bid}: <b style="color:#7ee787">${st.status}</b> | 分片 ${st.completed}/${st.total} (${pct}%) | 项 ${st.done_items}/${st.total_items}`;
+      if (['completed','failed','partial'].includes(st.status)) {
+        if (st.results) {
+          out.innerHTML += '<hr style="border-color:#2a3441;margin:8px 0">';
+          st.results.slice(0,10).forEach((r,i)=>{ out.innerHTML += `<div style="margin:3px 0"><span style="color:#79c0ff">[${i}]</span> ${String(r).substring(0,80)}</div>`; });
+          if (st.results.length>10) out.innerHTML += `<div style="color:#8b949e">…共 ${st.results.length} 条</div>`;
+        }
+        break;
+      }
+    }
+  } catch (e) {
+    out.textContent = '失败: ' + e.message;
+  }
+}
+
+function setConn(ok) {
+  document.getElementById('connDot').className = 'conn-status ' + (ok ? 'ok' : 'err');
+  document.getElementById('connText').textContent = ok ? '已连接 Relay' : '连接失败';
+}
+
+// === SSE 实时事件（上下线/让位变化立即刷新）===
+function connectSSE() {
+  const es = new EventSource(apiUrl('/api/events'));
+  es.addEventListener('agent_online', () => refresh());
+  es.addEventListener('agent_offline', () => refresh());
+  es.addEventListener('yield_update', () => refresh());
+  es.onerror = () => { es.close(); setTimeout(connectSSE, 3000); }; // 断线重连
+}
+
+// === 渲染 ===
+function render() {
+  // KPI
+  document.getElementById('kpiNodes').textContent = agents.length;
+  document.getElementById('hdrOnline').textContent = agents.length;
+  document.getElementById('hdrSeen').textContent = seen;
+
+  const allGpus = agents.flatMap(a => (a.gpus || []).map(g => ({...g, agent: a})));
+  document.getElementById('kpiNodesDetail').textContent = allGpus.length + ' 张 GPU';
+
+  const avgUtil = allGpus.length ? Math.round(allGpus.reduce((s,g) => s+g.util_gpu, 0) / allGpus.length) : 0;
+  document.getElementById('kpiAvgUtil').textContent = avgUtil + '%';
+  const lowUtil = allGpus.filter(g => g.util_gpu < 20).length;
+  document.getElementById('kpiUtilDetail').textContent = `${lowUtil} 张卡利用率 < 20%（待优化）`;
+
+  const memUsed = allGpus.reduce((s,g) => s+(g.mem_used_mb||0), 0);
+  const memTotal = allGpus.reduce((s,g) => s+(g.mem_total_mb||0), 0);
+  document.getElementById('kpiVram').textContent = `${(memUsed/1024).toFixed(1)} / ${(memTotal/1024).toFixed(1)} GB`;
+  document.getElementById('kpiVramDetail').textContent = `显存占用率 ${memTotal?Math.round(memUsed/memTotal*100):0}%`;
+
+  const idle = agents.filter(a => a.yield.level === 'idle').length;
+  const active = agents.filter(a => a.yield.level === 'active').length;
+  const busy = agents.filter(a => a.yield.level === 'busy_human').length;
+  document.getElementById('kpiYield').innerHTML =
+    `<span style="color:#7ee787">${idle}</span> / <span style="color:#ffa657">${active}</span> / <span style="color:#ff7b72">${busy}</span>`;
+  document.getElementById('kpiYieldDetail').textContent = '空闲 / 轻度活动 / 有人使用';
+
+  // 节点表
+  const body = document.getElementById('agentBody');
+  if (agents.length === 0) {
+    body.innerHTML = `<tr><td colspan="9" class="empty">
+      ⏳ 还没有 Agent 上线
+      <div class="hint">
+        在每台 4060 机器上执行（安装为 Windows 服务）：<br>
+        <code>gpu-mesh-agent.exe install -relay &lt;Relay公网IP&gt; -id &lt;主机名&gt;</code><br>
+        <code>gpu-mesh-agent.exe start</code>
+      </div>
+    </td></tr>`;
+    return;
+  }
+
+  body.innerHTML = agents.map(a => {
+    const gpus = (a.gpus || []);
+    const gpuCell = gpus.length
+      ? gpus.map(g => `${g.name}<br><span style="color:#8b949e;font-size:11px">GPU${g.index}</span>`).join('<hr style="border-color:#21262d;margin:4px 0">')
+      : '<span style="color:#6e7681">无 NVIDIA GPU</span>';
+
+    const utilCell = gpus.map(g => bar(g.util_gpu, '%', g.util_gpu)).join('<hr style="border-color:#21262d;margin:4px 0">');
+    const memCell = gpus.map(g => {
+      const pct = g.mem_total_mb ? Math.round(g.mem_used_mb/g.mem_total_mb*100) : 0;
+      return `${(g.mem_used_mb/1024).toFixed(1)}/${(g.mem_total_mb/1024).toFixed(1)}GB<br><span class="bar"><span class="bar-fill" style="width:${pct}%;background:${memColor(pct)}"></span></span>`;
+    }).join('<hr style="border-color:#21262d;margin:4px 0">');
+    const tempCell = gpus.map(g => `<span style="color:${tempColor(g.temp_c)}">${g.temp_c}℃</span>`).join('<hr style="border-color:#21262d;margin:4px 0">');
+    const powerCell = gpus.map(g => `${g.power_w.toFixed(0)}W<br><span style="color:#8b949e;font-size:11px">/ ${g.power_limit_w.toFixed(0)}W</span>`).join('<hr style="border-color:#21262d;margin:4px 0">');
+
+    const tags = Object.entries(a.tags || {}).map(([k,v]) => `<span class="tag">${k}=${v}</span>`).join('');
+    const engineCell = `${(a.engines||[]).map(e=>'🟢 '+e).join('<br>') || '<span style="color:#6e7681">未探测到</span>'}<br>` +
+      `<span style="color:#8b949e;font-size:11px">${(a.models||[]).join(', ')||'无模型'}</span>`;
+
+    const yieldBadge = `<span class="badge ${a.yield.level}">${a.yield.level.toUpperCase()} · ${a.yield.budget}%</span>` +
+      `<br><span style="color:#8b949e;font-size:11px">空闲 ${a.yield.idle_seconds}s · 外部GPU ${a.yield.external_util_gpu.toFixed(0)}%</span>`;
+
+    return `<tr>
+      <td><b>${a.hostname||'—'}</b><br><span style="color:#8b949e;font-size:11px" class="mono">${a.agent_id}</span><br>${tags}</td>
+      <td>${gpuCell}</td>
+      <td>${utilCell}</td>
+      <td class="mono">${memCell}</td>
+      <td>${tempCell}</td>
+      <td class="mono">${powerCell}</td>
+      <td>${engineCell}</td>
+      <td>${yieldBadge}</td>
+      <td class="mono" style="color:#8b949e">${fmtUptime(a.uptime_s)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function bar(val, suffix, util) {
+  const color = util < 20 ? '#6e7681' : util < 60 ? '#7ee787' : util < 85 ? '#ffa657' : '#ff7b72';
+  return `<span class="bar"><span class="bar-fill" style="width:${val}%;background:${color}"></span></span><span class="pct">${val}${suffix}</span>`;
+}
+function memColor(p) { return p < 50 ? '#7ee787' : p < 85 ? '#ffa657' : '#ff7b72'; }
+function tempColor(t) { return t < 60 ? '#7ee787' : t < 80 ? '#ffa657' : '#ff7b72'; }
+function fmtUptime(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm';
+  if (s < 86400) return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+  return Math.floor(s/86400) + 'd ' + Math.floor((s%86400)/3600) + 'h';
+}
+
+refresh();
+connectSSE();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

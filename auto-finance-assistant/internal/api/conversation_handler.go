@@ -104,3 +104,17 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 		Messages: items,
 	})
 }
+
+// handleDeleteConversation PIPL 被遗忘权：删除会话及所有消息。
+func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "invalid_id", "会话 ID 不能为空")
+		return
+	}
+	if err := storage.DeleteConversation(r.Context(), s.db, id); err != nil {
+		writeError(w, http.StatusInternalServerError, "db_error", "删除会话失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": true, "id": id})
+}

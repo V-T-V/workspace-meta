@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!-- P3-10：maximum-scale=1 禁用双击缩放，消除移动端 300ms 点击延迟 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>实时数字人</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>实时数字人</h1>
+    <div class="header-right">
+      <a href="/admin.html" class="admin-link" title="管理控制台">🎛️ 管理</a>
+      <div class="status" id="status" role="status" aria-live="polite" aria-atomic="true">未连接</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- 数字人形象区 -->
+    <section class="avatar-area">
+      <canvas id="avatar-canvas" width="512" height="512"></canvas>
+      <div class="listening-indicator" id="indicator" style="display:none">正在听…</div>
+    </section>
+
+    <!-- 控制与字幕区 -->
+    <section class="control-area">
+      <div class="controls">
+        <button id="mic-btn" class="mic-btn" aria-label="开始对话">🎤 开始对话</button>
+        <button id="stop-btn" class="stop-btn" disabled aria-label="停止">⏹ 停止</button>
+        <!-- P2-7：音量控制 + 语速控制 -->
+        <div class="volume-control">
+          <span title="音量">🔊</span>
+          <input type="range" id="volume" min="0" max="100" value="100" aria-label="音量">
+          <button id="mute-btn" class="mute-btn" aria-label="静音">🔊</button>
+        </div>
+        <div class="volume-control">
+          <span title="语速">⚡</span>
+          <input type="range" id="tts-rate" min="-50" max="100" value="0" step="10" aria-label="语速">
+          <span id="tts-rate-label">0%</span>
+        </div>
+        <!-- #2：角色选择器 -->
+        <select id="persona-select" class="persona-select" aria-label="选择数字人角色" style="display:none"></select>
+      </div>
+
+      <div class="latency-panel" id="latency" aria-live="off">
+        <div>首帧延迟: <span id="lat-frame">-</span></div>
+        <div>首token: <span id="lat-token">-</span></div>
+      </div>
+
+      <!-- P3-12：字幕区可滚动，避免长对话溢出 -->
+      <div class="subtitle" id="subtitle">
+        <div class="sub-user" id="sub-user" aria-live="polite"></div>
+        <div class="sub-assistant" id="sub-assistant" aria-live="polite"></div>
+      </div>
+
+      <!-- 文字输入（无麦克风也能对话）+ 清空 -->
+      <div class="text-input-area">
+        <input type="text" id="text-input" placeholder="或打字对话…" aria-label="文字输入"
+               autocomplete="off">
+        <button id="send-text-btn" aria-label="发送">📤</button>
+        <button id="clear-btn" class="clear-btn" aria-label="清空对话" title="清空对话">🗑</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="dashboard" id="dashboard">
+      <span>会话: <b id="d-sessions">-</b>/<b id="d-max">-</b></span>
+      <span>首帧P50: <b id="d-frame-p50">-</b></span>
+      <span>首帧P95: <b id="d-frame-p95">-</b></span>
+      <span>完成: <b id="d-total">-</b></span>
+      <span>错误: <b id="d-errors">-</b></span>
+      <span>运行: <b id="d-uptime">-</b></span>
+    </div>
+    <small>对着麦克风说话，数字人会开口回话 · 首响应 &lt;1.5s · <a href="/docs">API 文档</a> · <a href="/v1/models">OpenAI 兼容</a></small>
+  </footer>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

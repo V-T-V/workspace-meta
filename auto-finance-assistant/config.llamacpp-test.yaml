@@ -1,0 +1,29 @@
+server:
+  host: 127.0.0.1
+  port: 8080
+ollama:
+  backend: llamacpp
+  base_url: http://127.0.0.1:8081/v1
+  chat_model: Qwen3-4B
+  embedding_model: nomic-embed-text-v1.5.Q8_0
+  request_timeout_seconds: 300
+generation:
+  num_thread: 8
+  context_size: 4096
+  max_output_tokens: 1000
+  temperature: 0.3
+queue:
+  generation_concurrency: 1
+  maximum_waiting: 10
+  request_timeout_seconds: 300
+storage:
+  database_path: ./data/assistant.db
+  document_path: ./data/documents
+  temp_path: ./data/temp
+  backup_path: ./data/backups
+logging:
+  level: info
+  directory: ./data/logs
+  max_file_size_mb: 20
+  max_files: 7
+  retain_days: 30

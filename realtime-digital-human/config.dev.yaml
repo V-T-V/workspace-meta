@@ -1,0 +1,59 @@
+server:
+  host: 127.0.0.1
+  port: 8000
+  web_dir: web
+  cors_origins:
+  - '*'
+  max_sessions: 3
+  auth_token: ''
+  history_db: data/digitalhuman.db
+asr:
+  backend: whisper
+  model: small
+  language: zh
+  device: cuda
+  compute_type: int8
+  silence_ms: 500
+  vad_auto_trigger: true
+  vad_threshold: 0.01
+  base_url: ''
+  api_key: ''
+  timeout: 30.0
+llm:
+  backend: ollama
+  base_url: http://127.0.0.1:11434
+  model: qwen2.5:3b
+  system_prompt: 你是友好的数字人助手，回答简短自然，适合口语表达，每句不超过 20 字。
+  temperature: 0.7
+  max_tokens: 256
+  num_ctx: 2048
+  api_key: ''
+tts:
+  backend: edge
+  voice: zh-CN-XiaoxiaoNeural
+  rate: +0%
+  cosyvoice_script: scripts/cosyvoice_tts.py
+  voice_sample: assets/voice_sample.wav
+sentence_splitter:
+  punctuation: '。！？!?,.;；、
+
+    '
+  max_chars: 15
+lipsync:
+  backend: musetalk
+  portrait: assets/portrait_sample.png
+  musetalk_script: scripts/musetalk_render.py
+  fps: 25
+  output_width: 512
+  output_height: 768
+pusher:
+  backend: ws_mjpeg
+  jpeg_quality: 75
+personas:
+  list: []
+  default_id: default
+queue:
+  text_queue: 16
+  token_queue: 64
+  sentence_queue: 8
+  audio_queue: 32

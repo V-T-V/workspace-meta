@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 
 	"github.com/QiuShichang/auto-finance-assistant/internal/backup"
@@ -21,14 +23,16 @@ type Server struct {
 	model         modelclient.ModelClient
 	queue         *queue.LLMQueue
 	importer      *knowledge.Importer
+	db            *sql.DB
+	backend       string
 	vector        *rag.VectorSearcher
 	backup        *backup.Manager
 	adminPassword string
 }
 
 // New 构造 Server。
-func New(c *chat.Service, o modelclient.ModelClient, q *queue.LLMQueue, imp *knowledge.Importer) *Server {
-	return &Server{chat: c, model: o, queue: q, importer: imp}
+func New(c *chat.Service, o modelclient.ModelClient, q *queue.LLMQueue, db *sql.DB, imp *knowledge.Importer) *Server {
+	return &Server{chat: c, model: o, queue: q, db: db, importer: imp}
 }
 
 // SetVectorSearcher 注入向量检索器（M6）。
@@ -82,12 +86,26 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/feedback", s.handleCreateFeedback)
 	mux.HandleFunc("GET /api/feedback", s.AuthMiddleware(s.handleListFeedback))
 
-	// 审计与管理（M7，需认证）
+	// 审计与管理（需认证）
 	mux.HandleFunc("GET /api/audit/logs", s.AuthMiddleware(s.handleListAuditLogs))
 	mux.HandleFunc("GET /api/refused", s.AuthMiddleware(s.handleListRefused))
 	mux.HandleFunc("GET /api/metrics", s.AuthMiddleware(s.handleMetrics))
 
-	// 备份（M9，需认证）
+	// 合规日志（需认证）
+	mux.HandleFunc("GET /api/compliance/logs", s.AuthMiddleware(s.handleComplianceLogs))
+	mux.HandleFunc("GET /api/compliance/stats", s.AuthMiddleware(s.handleComplianceStats))
+
+	// 数据清理（需认证）
+	mux.HandleFunc("POST /api/system/purge", s.AuthMiddleware(s.handlePurge))
+
+	// 动态模型管理（需认证）
+	mux.HandleFunc("GET /api/models", s.AuthMiddleware(s.handleListModels))
+	mux.HandleFunc("POST /api/models/switch", s.AuthMiddleware(s.handleSwitchModel))
+
+	// 会话删除（PIPL 被遗忘权，需认证）
+	mux.HandleFunc("DELETE /api/conversations/{id}", s.AuthMiddleware(s.handleDeleteConversation))
+
+	// 备份（需认证）
 	mux.HandleFunc("POST /api/system/backup", s.AuthMiddleware(s.handleBackup))
 	mux.HandleFunc("GET /api/system/backups", s.AuthMiddleware(s.handleListBackups))
 
@@ -97,3 +115,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 
 // SetVersion 供 main 注入版本号。
 func SetVersion(v string) { version = v }
+
+// SetBackend sets the backend type.
+func (s *Server) SetBackend(b string) { s.backend = b }
+
+// cachedHealth returns cached health status.
+func (s *Server) cachedHealth() modelclient.HealthStatus {
+	return s.model.Health(context.Background())
+}

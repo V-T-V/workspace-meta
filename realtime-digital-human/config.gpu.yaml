@@ -1,0 +1,63 @@
+server:
+  host: 0.0.0.0
+  port: 8000
+  web_dir: web
+  cors_origins:
+  - '*'
+  max_sessions: 2
+  auth_token: ''
+asr:
+  backend: whisper
+  model: small
+  language: zh
+  device: auto
+  silence_ms: 500
+llm:
+  backend: ollama
+  base_url: http://127.0.0.1:11434
+  model: qwen2.5:3b
+  system_prompt: 你是友好的数字人助手，回答简短自然，适合口语表达，每句不超过 20 字。
+  temperature: 0.7
+  max_tokens: 128
+tts:
+  backend: edge
+  voice: zh-CN-XiaoxiaoNeural
+  rate: +0%
+  cosyvoice_script: scripts/cosyvoice_tts.py
+  voice_sample: assets/voice_sample.wav
+sentence_splitter:
+  punctuation: '。！？!?,.;；、
+
+    '
+  max_chars: 12
+lipsync:
+  backend: musetalk
+  portrait: assets/portrait_sample.png
+  musetalk_script: scripts/musetalk_render.py
+  fps: 25
+  output_width: 512
+  output_height: 768
+pusher:
+  backend: ws_mjpeg
+  jpeg_quality: 80
+queue:
+  text_queue: 16
+  token_queue: 64
+  sentence_queue: 8
+  audio_queue: 32
+personas:
+  default_id: xiaoxiao
+  list:
+  - id: xiaoxiao
+    name: 晓晓（温柔客服）
+    voice: zh-CN-XiaoxiaoNeural
+    system_prompt: 你是温柔的数字人客服，回答简短有礼，适合口语表达。
+  - id: yunxi
+    name: 云希（活力助手）
+    voice: zh-CN-YunxiNeural
+    system_prompt: 你是活力四射的数字人助手，回答简短热情。
+  - id: xiaoyi
+    name: 晓伊（可爱少女）
+    voice: zh-CN-XiaoyiNeural
+    system_prompt: 你是可爱的数字人少女，回答简短俏皮。
+gpu_memory_budget_mb: 8000

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数字人管理控制台</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+  .admin-wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+  .admin-header { display: flex; justify-content: space-between; align-items: center;
+                  padding: 16px 0; border-bottom: 1px solid #334155; margin-bottom: 24px; }
+  .admin-header h1 { font-size: 1.5rem; color: #e2e8f0; }
+  .admin-header a { color: #38bdf8; text-decoration: none; }
+  .panel { background: rgba(30,41,59,0.6); border: 1px solid #334155; border-radius: 12px;
+           padding: 20px; margin-bottom: 20px; }
+  .panel h2 { font-size: 1.1rem; color: #38bdf8; margin-bottom: 16px;
+              display: flex; align-items: center; gap: 8px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 768px) { .grid2 { grid-template-columns: 1fr; } }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px; }
+  .field input, .field select { width: 100%; padding: 8px 12px; border: 1px solid #334155;
+                                 border-radius: 6px; background: #0f172a; color: #e2e8f0;
+                                 font-size: 0.9rem; box-sizing: border-box; }
+  .field select { cursor: pointer; }
+  .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
+         font-size: 0.9rem; transition: all 0.2s; }
+  .btn-primary { background: #0ea5e9; color: white; }
+  .btn-primary:hover { background: #0284c7; }
+  .btn-test { background: #10b981; color: white; }
+  .btn-test:hover { background: #059669; }
+  .btn-danger { background: #ef4444; color: white; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .engine-status { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .engine-chip { padding: 6px 14px; border-radius: 16px; font-size: 0.85rem;
+                 background: #1e293b; border: 1px solid #334155; }
+  .engine-chip.mock { background: #422006; border-color: #7c2d12; }
+  .engine-chip.ok { background: #052e16; border-color: #166534; }
+  .test-result { padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-size: 0.85rem;
+                 display: none; }
+  .test-result.ok { background: #052e16; color: #86efac; display: block; }
+  .test-result.fail { background: #450a0a; color: #fca5a5; display: block; }
+  .test-result.pending { background: #1e1b4b; color: #c7d2fe; display: block; }
+  #log-view { width: 100%; height: 320px; background: #0f172a; color: #cbd5e1;
+              border: 1px solid #334155; border-radius: 6px; padding: 10px;
+              font-family: 'Consolas', monospace; font-size: 0.8rem;
+              white-space: pre-wrap; overflow-y: auto; resize: vertical; }
+  .log-controls { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px;
+           color: white; z-index: 999; opacity: 0; transition: opacity 0.3s; }
+  .toast.show { opacity: 1; }
+  .toast.success { background: #16a34a; }
+  .toast.error { background: #dc2626; }
+  .toast.warn { background: #d97706; }
+  .meta { font-size: 0.8rem; color: #64748b; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="admin-wrap">
+  <div class="admin-header">
+    <h1>🎛️ 数字人管理控制台</h1>
+    <a href="/">← 返回对话</a>
+  </div>
+
+  <!-- 仪表盘 -->
+  <div class="panel">
+    <h2>📊 运行状态</h2>
+    <div class="engine-status" id="engine-status"></div>
+    <div class="meta" id="dashboard-meta">会话: - | 运行: -</div>
+  </div>
+
+  <!-- 配置 + 测试 -->
+  <div class="grid2">
+    <div class="panel">
+      <h2>⚙️ 配置编辑</h2>
+      <p class="meta" style="margin-bottom:12px">改完点"保存配置"，再点"应用并重启"生效</p>
+
+      <div class="field">
+        <label>ASR backend</label>
+        <select id="asr-backend">
+          <option value="whisper">whisper（本地，占 ~1GB）</option>
+          <option value="groq">groq（云，whisper-large-v3）</option>
+          <option value="cloud">cloud（云，通用）</option>
+          <option value="mock">mock（演示）</option>
+          <option value="disabled">disabled</option>
+        </select>
+      </div>
+      <div class="field"><label>ASR model / base_url</label>
+        <input id="asr-model" placeholder="small / whisper-large-v3">
+      </div>
+      <div class="field"><label>ASR base_url（云用，预设厂商留空）</label>
+        <input id="asr-base-url" placeholder="留空用预设">
+      </div>
+      <div class="field"><label>ASR api_key（留空不改；环境变量 DH_ASR_API_KEY 优先）</label>
+        <input id="asr-api-key" type="password" placeholder="sk-...">
+      </div>
+
+      <div class="field">
+        <label>LLM backend</label>
+        <select id="llm-backend">
+          <option value="ollama">ollama（本地）</option>
+          <option value="deepseek">deepseek（云）</option>
+          <option value="glm">glm 智谱（云）</option>
+          <option value="qwen">qwen 通义（云）</option>
+          <option value="kimi">kimi（云）</option>
+          <option value="openai">openai（云通用）</option>
+          <option value="mock">mock（演示）</option>
+          <option value="disabled">disabled</option>
+        </select>
+      </div>
+      <div class="field"><label>LLM model</label>
+        <input id="llm-model" placeholder="qwen2.5:3b / deepseek-chat">
+      </div>
+      <div class="field"><label>LLM base_url（ollama/local 用，云预设留空）</label>
+        <input id="llm-base-url" placeholder="http://127.0.0.1:11434">
+      </div>
+      <div class="field"><label>LLM api_key（留空不改；环境变量 DH_LLM_API_KEY 优先）</label>
+        <input id="llm-api-key" type="password" placeholder="sk-...">
+      </div>
+
+      <div class="field">
+        <label>TTS backend</label>
+        <select id="tts-backend">
+          <option value="edge">edge（微软云，默认）</option>
+          <option value="cosyvoice">cosyvoice（本地克隆）</option>
+          <option value="mock">mock（演示）</option>
+          <option value="disabled">disabled</option>
+        </select>
+      </div>
+      <div class="field"><label>TTS voice</label>
+        <input id="tts-voice" placeholder="zh-CN-XiaoxiaoNeural">
+      </div>
+
+      <div class="field">
+        <label>唇形 backend</label>
+        <select id="lipsync-backend">
+          <option value="musetalk">musetalk（本地，必须）</option>
+          <option value="mock">mock（占位帧）</option>
+          <option value="disabled">disabled</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:16px">
+        <button class="btn btn-primary" onclick="saveConfig()">💾 保存配置</button>
+        <button class="btn btn-danger" onclick="restartService()">🔄 应用并重启</button>
+      </div>
+      <div class="meta" id="cfg-path">配置文件: 加载中...</div>
+    </div>
+
+    <div class="panel">
+      <h2>🔌 测试验证</h2>
+
+      <div class="field">
+        <label>LLM 连接</label>
+        <button class="btn btn-test btn-sm" onclick="testConn('llm')">测试 LLM</button>
+        <div class="test-result" id="test-llm"></div>
+      </div>
+
+      <div class="field">
+        <label>ASR 连接</label>
+        <button class="btn btn-test btn-sm" onclick="testConn('asr')">测试 ASR</button>
+        <div class="test-result" id="test-asr"></div>
+      </div>
+
+      <div class="field">
+        <label>TTS 合成</label>
+        <button class="btn btn-test btn-sm" onclick="testConn('tts')">测试 TTS</button>
+        <div class="test-result" id="test-tts"></div>
+      </div>
+
+      <div class="field">
+        <label>环境自检（GPU/端口/依赖）</label>
+        <button class="btn btn-test btn-sm" onclick="runSelftest()">🔍 一键自检</button>
+        <div class="test-result" id="test-selftest"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日志 -->
+  <div class="panel">
+    <h2>📜 运行日志</h2>
+    <div class="log-controls">
+      <label><input type="checkbox" id="log-autorefresh" checked> 自动刷新（3s）</label>
+      <select id="log-level">
+        <option value="">全部</option>
+        <option value="ERROR">仅 ERROR</option>
+        <option value="WARNING">仅 WARNING+</option>
+      </select>
+      <button class="btn btn-sm" style="background:#475569;color:white" onclick="refreshLogs()">立即刷新</button>
+      <label><input type="checkbox" id="log-autoscroll" checked> 自动滚底</label>
+    </div>
+    <div id="log-view">加载中...</div>
+  </div>
+
+  <!-- 会话与记忆 -->
+  <div class="panel">
+    <h2>🧠 会话历史与记忆</h2>
+    <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap">
+      <button class="btn btn-sm" style="background:#475569;color:white" onclick="loadSessions()">🔄 刷新会话列表</button>
+      <span class="meta" id="sessions-meta">点击刷新加载会话列表</span>
+    </div>
+    <div class="grid2">
+      <div>
+        <h3 style="color:#94a3b8;font-size:0.9rem;margin-bottom:8px">会话列表</h3>
+        <div id="sessions-list" style="max-height:200px;overflow-y:auto"></div>
+      </div>
+      <div>
+        <h3 style="color:#94a3b8;font-size:0.9rem;margin-bottom:8px">选中会话的记忆</h3>
+        <div id="memory-view" style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px;max-height:200px;overflow-y:auto;font-size:0.8rem;color:#cbd5e1">
+          选择左侧会话查看
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/static/admin.js"></script>
+</body>
+</html>

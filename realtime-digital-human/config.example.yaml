@@ -1,0 +1,94 @@
+server:
+  host: 0.0.0.0
+  port: 8000
+  web_dir: web
+  cors_origins:
+  - '*'
+  max_sessions: 3
+  auth_token: ''
+  history_db: data/digitalhuman.db
+asr:
+  # 本地（占 ~1GB 显存）：whisper（device: auto 探测 CUDA）
+  # 线上（省显存，GPU 全留给唇形）：cloud（通用）/ groq / openai / deepinfra / siliconflow
+  # 纯演示/无网络：mock（预置固定回复，0 GPU 0 网络）
+  # 兼容：disabled（空，不产生识别结果）
+  backend: whisper
+  model: small              # whisper 用 small/base/tiny；云端用 whisper-large-v3
+  language: zh
+  device: auto              # 仅 whisper：auto/cuda/cpu
+  compute_type: null        # 仅 whisper
+  silence_ms: 500
+  vad_auto_trigger: true
+  vad_threshold: 0.01
+  # 云端 ASR（backend=cloud/groq/... 时生效，把 ASR 上云省 ~1GB 显存给唇形）
+  base_url: ''              # 空=按 backend 自动套预设；如用自建/代理填这里
+  api_key: ''               # 线上必填（环境变量 DH_ASR_API_KEY 优先，安全）
+  timeout: 30.0             # 云端转写超时（秒）
+llm:
+  # 本地：ollama（默认，走 127.0.0.1:11434）
+  # 线上通用：openai（base_url 必须显式配）
+  # 线上快捷（自动套预设 base_url）：deepseek / glm(智谱) / qwen(通义) / kimi
+  # 纯演示/无网络：mock（预置固定回复，0 GPU 0 网络）
+  # 兼容旧：gpu_mesh（走 OpenAI 兼容网关）/ disabled(空回复)
+  backend: ollama
+  base_url: http://127.0.0.1:11434
+  model: qwen2.5:3b
+  system_prompt: 你是友好的数字人助手，回答简短自然，适合口语表达，每句不超过 20 字。
+  temperature: 0.7
+  max_tokens: 256
+  num_ctx: 2048
+  # 线上云 API 密钥（本地 ollama 无需填）。
+  # 安全：环境变量 DH_LLM_API_KEY 优先于此值，key 不进 git/EXE。
+  # 线上示例：
+  #   set DH_LLM_API_KEY=sk-xxxx  （或在 PowerShell: $env:DH_LLM_API_KEY="sk-xxxx"）
+  #   然后这里 backend 填 deepseek（或 glm/qwen/kimi），model 填对应模型名即可
+  api_key: ""
+tts:
+  # 云端（微软，0 显存）：edge（默认）
+  # 本地（可克隆音色，占 ~1.5GB 显存）：cosyvoice
+  # 纯演示/无网络：mock（静音 PCM，0 GPU 0 网络）
+  # 兼容：disabled（不合成）
+  backend: edge
+  voice: zh-CN-XiaoxiaoNeural
+  rate: +0%
+  cosyvoice_script: scripts/cosyvoice_tts.py
+  voice_sample: assets/voice_sample.wav
+sentence_splitter:
+  punctuation: '。！？!?,.;；、
+
+    '
+  max_chars: 15
+lipsync:
+  # 本地（占 ~1.5GB 显存，实时帧渲染）：musetalk（默认，数字人核心）
+  # 纯演示（占位帧，0 GPU）：mock
+  # 兼容：disabled（不渲染）
+  backend: musetalk
+  portrait: assets/portrait_sample.png
+  musetalk_script: scripts/musetalk_render.py
+  fps: 25
+  output_width: 512
+  output_height: 768
+pusher:
+  backend: ws_mjpeg
+  jpeg_quality: 75
+# ★ 长期记忆（创新）：超阈值时把旧消息压成摘要，保留长期记忆 + 控制上下文窗口
+memory:
+  enabled: true                # 总开关（false 退回直接丢弃旧消息）
+  summary_threshold: 10        # history 超此条数触发压缩
+  keep_recent_pairs: 4         # 压缩后保留最近 N 轮原文（user+assistant 对）
+  summary_prompt: '请把以下对话历史压缩成一段简洁的中文摘要（不超过150字），重点保留：用户的称呼/姓名、偏好、关键事实、未完成的待办。只输出摘要内容，不要加''摘要：''之类前缀。'
+personas:
+  default_id: default
+  list:
+  - id: default
+    name: 默认助手
+    voice: zh-CN-XiaoxiaoNeural
+    system_prompt: 你是友好的数字人助手，回答简短自然。
+    portrait: ''
+    greeting: ''
+queue:
+  text_queue: 16
+  token_queue: 64
+  sentence_queue: 8
+  audio_queue: 32
+gpu_memory_budget_mb: 8000

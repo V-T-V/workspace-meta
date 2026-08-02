@@ -1,0 +1,72 @@
+# 汽车金融本地智能客服系统 · 生产环境配置模板（RTX 4060 8GB + Qwen3 4B）
+# 复制为 config.yaml 后按需修改。开发机 CPU 验证用 config.dev.yaml。
+
+server:
+  host: 127.0.0.1        # 局域网访问改 0.0.0.0 并启用 security.admin_password
+  port: 8080
+  read_timeout_seconds: 30
+  write_timeout_seconds: 120
+
+ollama:
+  base_url: http://127.0.0.1:11434
+  chat_model: qwen3:4b              # 生产：4B 模型，RTX 4060 GPU 推理
+  embedding_model: qwen3-embedding:0.6b
+  request_timeout_seconds: 90
+  keep_alive: 30m
+
+generation:
+  num_gpu: 33             # RTX 4060：尽量 offload 到 GPU（max_layers）
+  context_size: 6144
+  max_output_tokens: 400
+  temperature: 0.1
+  top_p: 0.8
+  top_k: 20
+  repeat_penalty: 1.05
+
+rag:
+  fts_limit: 20
+  vector_limit: 20
+  final_limit: 5
+  minimum_confidence: 0.40
+  high_confidence: 0.70
+  vector_weight: 0.65
+  keyword_weight: 0.35
+
+queue:
+  generation_concurrency: 1
+  maximum_waiting: 10
+  request_timeout_seconds: 120
+
+storage:
+  database_path: ./data/assistant.db
+  document_path: ./data/documents
+  temp_path: ./data/temp
+  backup_path: ./data/backups
+
+documents:
+  max_file_size_mb: 50
+  chunk_min_chars: 300
+  chunk_max_chars: 800
+  chunk_overlap_chars: 80
+  allowed_extensions:
+    - .txt
+    - .md
+    - .html
+    - .docx
+    - .xlsx
+    - .pdf
+
+logging:
+  level: info
+  directory: ./data/logs
+  max_file_size_mb: 20
+  max_files: 7
+  retain_days: 30
+
+backup:
+  enabled: true
+  schedule: "02:00"
+  retain_count: 7
+
+security:
+  admin_password: ""      # 第一版单管理员密码，空则不校验

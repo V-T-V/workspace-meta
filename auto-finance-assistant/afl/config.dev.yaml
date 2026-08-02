@@ -1,0 +1,74 @@
+# 汽车金融本地智能客服系统 · 开发机 CPU 验证配置
+# 机器：AMD Ryzen 7 PRO 4750U (8C16T) / 32GB / 无独显
+# 模型：qwen2.5:1.5b（CPU 推理，每次回答约 10-30s，验证链路正确性而非速度）
+# 与生产代码完全一致，仅模型与推理参数差异。
+
+server:
+  host: 127.0.0.1
+  port: 8080
+  read_timeout_seconds: 30
+  write_timeout_seconds: 120
+
+ollama:
+  base_url: http://127.0.0.1:11434
+  chat_model: qwen2.5:3b
+  embedding_model: nomic-embed-text # M6 向量检索（专用 embedding 模型）
+  request_timeout_seconds: 180      # CPU 慢，放宽超时
+  keep_alive: 30m
+
+generation:
+  num_thread: 8          # CPU 核心数（4750U 8 物理核）
+  context_size: 4096     # CPU 下略减上下文，省内存
+  max_output_tokens: 400
+  temperature: 0.1       # CPU 小模型温度略高，避免复读
+  top_p: 0.9
+  top_k: 40
+  repeat_penalty: 1.1
+
+rag:
+  fts_limit: 20
+  vector_limit: 20
+  final_limit: 5
+  minimum_confidence: 0.40
+  high_confidence: 0.70
+  vector_weight: 0.65
+  keyword_weight: 0.35
+
+queue:
+  generation_concurrency: 1
+  maximum_waiting: 10
+  request_timeout_seconds: 180      # CPU 下放宽
+
+storage:
+  database_path: ./data/assistant.db
+  document_path: ./data/documents
+  temp_path: ./data/temp
+  backup_path: ./data/backups
+
+documents:
+  max_file_size_mb: 50
+  chunk_min_chars: 300
+  chunk_max_chars: 800
+  chunk_overlap_chars: 80
+  allowed_extensions:
+    - .txt
+    - .md
+    - .html
+    - .docx
+    - .xlsx
+    - .pdf
+
+logging:
+  level: info
+  directory: ./data/logs
+  max_file_size_mb: 20
+  max_files: 7
+  retain_days: 30
+
+backup:
+  enabled: false         # 开发期不自动备份
+  schedule: "02:00"
+  retain_count: 7
+
+security:
+  admin_password: ""

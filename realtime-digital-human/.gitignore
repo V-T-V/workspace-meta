@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+*.so
+
+# 测试 / 工具
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 配置（实际配置不入库，用 config.example.yaml / config.dev.yaml）
+config.yaml
+
+# 模型与大文件
+assets/*.png
+!assets/portrait_sample.png
+assets/*.wav
+models/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 打包产物
+build/
+dist/
+*.spec.bak
+packaging/digitalhuman.png

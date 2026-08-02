@@ -1,7 +1,8 @@
 package api
 
 import (
-	"crypto/subtle"
+	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -26,7 +27,7 @@ func (s *Server) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				provided = strings.TrimPrefix(auth, "Bearer ")
 			}
 		}
-		if subtle.ConstantTimeCompare([]byte(provided), []byte(s.adminPassword)) != 1 {
+		if !verifyPassword(provided, s.adminPassword) {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "管理员认证失败")
 			return
 		}
@@ -147,4 +148,120 @@ func truncateStr(s string, maxRunes int) string {
 		return s
 	}
 	return string(r[:maxRunes])
+}
+
+// handlePurge 手动触发数据清理。
+func (s *Server) handlePurge(w http.ResponseWriter, r *http.Request) {
+	days := 90
+	if d := r.URL.Query().Get("days"); d != "" {
+		fmt.Sscanf(d, "%d", &days)
+	}
+	if days < 1 {
+		days = 90
+	}
+	result, err := storage.PurgeExpiredData(r.Context(), s.db, days)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "purge_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// handleComplianceLogs 查询合规日志。
+func (s *Server) handleComplianceLogs(w http.ResponseWriter, r *http.Request) {
+	eventType := r.URL.Query().Get("type")
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+	}
+	items, err := storage.ListComplianceLogs(r.Context(), s.db, eventType, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "db_error", "查询合规日志失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": len(items)})
+}
+
+// handleComplianceStats 合规统计汇总。
+func (s *Server) handleComplianceStats(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.db.QueryContext(r.Context(),
+		`SELECT event_type, COALESCE(action_taken,''), count(*) FROM compliance_logs GROUP BY event_type, action_taken ORDER BY count(*) DESC`)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "db_error", "查询合规统计失败")
+		return
+	}
+	defer rows.Close()
+	type stat struct {
+		EventType   string `json:"eventType"`
+		Count       int    `json:"count"`
+		ActionTaken string `json:"actionTaken"`
+	}
+	var stats []stat
+	totalBlocks, totalRequests := 0, 0
+	for rows.Next() {
+		var st stat
+		if rows.Scan(&st.EventType, &st.ActionTaken, &st.Count) == nil {
+			stats = append(stats, st)
+			if st.ActionTaken == "block" || st.ActionTaken == "refuse" {
+				totalBlocks += st.Count
+			}
+			if st.EventType == "model_invoke" || st.EventType == "guard_block" {
+				totalRequests += st.Count
+			}
+		}
+	}
+	blockRate := 0.0
+	if totalRequests > 0 {
+		blockRate = float64(totalBlocks) / float64(totalRequests) * 100
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"stats": stats, "totalBlocks": totalBlocks, "totalRequests": totalRequests, "blockRate": blockRate})
+}
+
+// handleListModels 列出可用模型。
+func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
+	var available []string
+	if mc, ok := s.model.(interface {
+		AvailableModels(context.Context) []string
+	}); ok {
+		available = mc.AvailableModels(r.Context())
+	}
+	current := s.model.ChatModel()
+	type modelInfo struct {
+		Name    string `json:"name"`
+		Current bool   `json:"current"`
+	}
+	var out []modelInfo
+	found := false
+	for _, m := range available {
+		out = append(out, modelInfo{Name: m, Current: m == current})
+		if m == current {
+			found = true
+		}
+	}
+	if !found {
+		out = append([]modelInfo{{Name: current, Current: true}}, out...)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"models": out, "current": current, "backend": s.backend})
+}
+
+// handleSwitchModel 动态切换模型。
+func (s *Server) handleSwitchModel(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Model string `json:"model"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_body", "请求体格式错误")
+		return
+	}
+	if body.Model == "" {
+		writeError(w, http.StatusBadRequest, "empty_model", "model 不能为空")
+		return
+	}
+	mc, ok := s.model.(interface{ SetChatModel(string) })
+	if !ok {
+		writeError(w, http.StatusNotImplemented, "not_supported", "当前后端不支持动态切换")
+		return
+	}
+	mc.SetChatModel(body.Model)
+	writeJSON(w, http.StatusOK, map[string]any{"switched": true, "model": body.Model})
 }

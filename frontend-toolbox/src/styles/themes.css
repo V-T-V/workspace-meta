@@ -1,0 +1,72 @@
+/* =============================================================================
+   前端工具箱 · 主题变量
+   深色 / 浅色，通过 [data-theme] 切换。强调色按分组分配。
+   ============================================================================= */
+
+:root {
+  /* 分组强调色（亮色，浅色主题用） */
+  --c-blue: #2563eb;
+  --c-cyan: #0891b2;
+  --c-red: #dc2626;
+  --c-green: #16a34a;
+  --c-orange: #ea580c;
+  --c-purple: #9333ea;
+  --c-yellow: #ca8a04;
+  --c-pink: #db2777;
+  --c-indigo: #4f46e5;
+  --c-lime: #65a30d;
+  --c-gray: #6b7280;
+}
+
+/* 浅色主题（默认） */
+:root,
+[data-theme='light'] {
+  --bg: #f8fafc;
+  --bg-elevated: #ffffff;
+  --bg-soft: #f1f5f9;
+  --bg-hover: #e2e8f0;
+  --bg-active: #dbeafe;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-soft: #475569;
+  --text-muted: #94a3b8;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --code-bg: #f8fafc;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+/* 深色主题 */
+[data-theme='dark'] {
+  --bg: #0e1430;
+  --bg-elevated: #1a2147;
+  --bg-soft: #161c3a;
+  --bg-hover: #232a52;
+  --bg-active: #2a3470;
+  --border: #2a3470;
+  --border-strong: #3a4580;
+  --text: #e8edf7;
+  --text-soft: #b0bcd6;
+  --text-muted: #6b78a0;
+  --accent: #6b8aff;
+  --accent-soft: #1e2a5e;
+  --danger: #f87171;
+  --danger-soft: #3d1a1a;
+  --success: #4ade80;
+  --success-soft: #14302a;
+  --warning: #fbbf24;
+  --warning-soft: #3d2f10;
+  --code-bg: #0a0f24;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
