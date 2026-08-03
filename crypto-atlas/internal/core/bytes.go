@@ -138,3 +138,48 @@ func base64Encode(data []byte) string {
 	}
 	return string(result)
 }
+
+// DecodeBase64 解码 base64 字符串。
+func DecodeBase64(s string) ([]byte, error) {
+	return base64Decode(s)
+}
+
+func base64Decode(s string) ([]byte, error) {
+	const tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	rev := make(map[byte]int)
+	for i := 0; i < 64; i++ {
+		rev[tbl[i]] = i
+	}
+	s = strings.TrimRight(s, "=")
+	var result []byte
+	for i := 0; i < len(s); i += 4 {
+		var vals [4]int
+		count := 0
+		for j := 0; j < 4 && i+j < len(s); j++ {
+			v, ok := rev[s[i+j]]
+			if !ok {
+				return nil, fmt.Errorf("非法base64字符: %c", s[i+j])
+			}
+			vals[j] = v
+			count++
+		}
+		result = append(result, byte(vals[0]<<2|vals[1]>>4))
+		if count > 2 {
+			result = append(result, byte(vals[1]<<4|vals[2]>>2))
+		}
+		if count > 3 {
+			result = append(result, byte(vals[2]<<6|vals[3]))
+		}
+	}
+	return result, nil
+}
+
+// HashSimple 简单 hash（FNV-1a，零依赖，非密码学安全）。
+func HashSimple(data []byte) uint64 {
+	var h uint64 = 14695981039346656037
+	for _, b := range data {
+		h ^= uint64(b)
+		h *= 1099511628211
+	}
+	return h
+}

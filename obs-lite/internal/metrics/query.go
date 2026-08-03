@@ -326,3 +326,43 @@ func CountMetrics(points []types.MetricPoint) int {
 	}
 	return len(seen)
 }
+
+// LatestPoint 返回某 metric 名称的最新点。
+func LatestPoint(points []types.MetricPoint, name string) *types.MetricPoint {
+	var latest *types.MetricPoint
+	for i := range points {
+		if points[i].Name != name {
+			continue
+		}
+		if latest == nil || points[i].Timestamp.After(latest.Timestamp) {
+			latest = &points[i]
+		}
+	}
+	return latest
+}
+
+// FilterByName 按名称过滤 metric 点。
+func FilterByName(points []types.MetricPoint, name string) []types.MetricPoint {
+	var out []types.MetricPoint
+	for _, p := range points {
+		if p.Name == name {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// AvgByName 返回某 metric 的平均值。
+func AvgByName(points []types.MetricPoint, name string) float64 {
+	sum, count := 0.0, 0
+	for _, p := range points {
+		if p.Name == name {
+			sum += p.Value
+			count++
+		}
+	}
+	if count == 0 {
+		return 0
+	}
+	return sum / float64(count)
+}

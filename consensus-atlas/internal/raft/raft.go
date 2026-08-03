@@ -508,3 +508,23 @@ func MaxTerm(a, b uint64) uint64 {
 func (n *Node) IsLeader() bool {
 	return n.State == core.StateLeader
 }
+
+// CurrentTerm 返回节点当前任期。
+func (n *Node) CurrentTermVal() uint64 {
+	return n.CurrentTerm
+}
+
+// LogLength 返回日志长度。
+func (n *Node) LogLengthVal() int {
+	return len(n.Log.Entries)
+}
+
+// IsFollower 报告节点是否为 Follower。
+func (n *Node) IsFollower() bool {
+	return n.State == core.StateFollower
+}
+
+// PeersCount 返回集群节点数（含自己）。
+func (n *Node) PeersCount() int {
+	return len(n.Peers)
+}

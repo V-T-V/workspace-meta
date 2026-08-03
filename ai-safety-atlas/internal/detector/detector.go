@@ -301,3 +301,31 @@ func (d *Detector) ResetStats() {
 	d.ruleHits = make(map[string]int)
 	d.severityStats = make(map[types.Severity]int)
 }
+
+// HasRule 报告是否存在指定名称的规则。
+func (d *Detector) HasRule(name string) bool {
+	for _, r := range d.rules {
+		if r.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// TotalRules 返回规则总数。
+func (d *Detector) TotalRules() int {
+	return len(d.rules)
+}
+
+// MaxSeverity 返回历史检测中的最高严重度。
+func (d *Detector) MaxSeverity() types.Severity {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	max := types.SeverityInfo
+	for s := range d.severityStats {
+		if s > max {
+			max = s
+		}
+	}
+	return max
+}

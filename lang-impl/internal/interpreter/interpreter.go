@@ -993,3 +993,6 @@ func FormatValue(v any) string {
 // 内置函数 reverse（字符串反转）
 // 在 evalCall 里检测
 funcX:
+
+// 内置函数 type(x) 返回值类型名字符串
+// 注：此函数在 evalCall 中检测 e.Callee == "type"

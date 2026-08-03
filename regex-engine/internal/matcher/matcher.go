@@ -726,3 +726,37 @@ func (m *Matcher) MustFindAll(text string) []Match {
 	matches := m.FindAll(text)
 	return matches
 }
+
+// PatternsEqual 报告两个正则是否匹配相同的文本（简化：编译后比较）。
+func PatternsEqual(a, b string) bool {
+	ma, err1 := Compile(a)
+	mb, err2 := Compile(b)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	testCases := []string{"abc", "ABC", "123", "a1b", "", "test value 42"}
+	for _, tc := range testCases {
+		if ma.Match(tc) != mb.Match(tc) {
+			return false
+		}
+	}
+	return true
+}
+
+// FindString 返回第一个匹配的文本（或空串）。
+func (m *Matcher) FindString(text string) string {
+	matches := m.FindAll(text)
+	if len(matches) == 0 {
+		return ""
+	}
+	return matches[0].Text
+}
+
+// ReplaceFirst 只替换第一个匹配。
+func (m *Matcher) ReplaceFirst(text, replacement string) string {
+	matches := m.FindAll(text)
+	if len(matches) == 0 {
+		return text
+	}
+	return text[:matches[0].Start] + replacement + text[matches[0].End:]
+}

@@ -249,3 +249,31 @@ func (p Pipeline) SinkCount() int {
 	}
 	return c
 }
+
+// StepIDs 返回所有步骤ID列表。
+func (p Pipeline) StepIDs() []string {
+	out := make([]string, 0, len(p.Steps))
+	for _, s := range p.Steps {
+		out = append(out, s.ID)
+	}
+	return out
+}
+
+// HasCycle 检查管道是否有循环依赖（委托 TopoSort）。
+func (p Pipeline) HasCycle() bool {
+	_, err := p.TopoSort()
+	return err != nil
+}
+
+// ConnectorTypes 返回所有连接器类型列表。
+func (p Pipeline) ConnectorTypes() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range p.Steps {
+		if !seen[s.Connector] {
+			seen[s.Connector] = true
+			out = append(out, s.Connector)
+		}
+	}
+	return out
+}

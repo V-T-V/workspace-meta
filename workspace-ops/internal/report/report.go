@@ -567,3 +567,38 @@ func DirtyProjects(projects []ProjectView) []ProjectView {
 	}
 	return out
 }
+
+// ProjectsByHealth 按健康评分降序排列。
+func ProjectsByHealth(projects []ProjectView) []ProjectView {
+	out := make([]ProjectView, len(projects))
+	copy(out, projects)
+	sort.Slice(out, func(i, j int) bool {
+		return CalculateHealth(out[i]) > CalculateHealth(out[j])
+	})
+	return out
+}
+
+// SafeProjects 返回安全（非 dirty）的项目列表。
+func SafeProjects(projects []ProjectView) []ProjectView {
+	var out []ProjectView
+	for _, p := range projects {
+		if !p.GitDirty {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// FormatStackSummary 返回栈分布的可读字符串。
+func FormatStackSummary2(summary map[string]int) string {
+	keys := make([]string, 0, len(summary))
+	for k := range summary {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", k, summary[k]))
+	}
+	return strings.Join(parts, " ")
+}

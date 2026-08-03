@@ -1104,3 +1104,27 @@ func TestSplitBuiltin(t *testing.T) {
 		t.Error("split应返回3段")
 	}
 }
+
+func TestForLoopBreak(t *testing.T) {
+	src := `let total = 0;
+for (let i = 0; i < 100; i = i + 1) {
+  if (i == 5) { break; }
+  total = total + i;
+}
+return total;`
+	if runInt(t, src) != 10 {
+		t.Error("break 应使 total=10")
+	}
+}
+
+func TestForLoopContinue(t *testing.T) {
+	src := `let total = 0;
+for (let i = 0; i < 5; i = i + 1) {
+  if (i == 2) { continue; }
+  total = total + i;
+}
+return total;`
+	if runInt(t, src) != 8 {
+		t.Error("continue 应使 total=8（0+1+3+4）")
+	}
+}

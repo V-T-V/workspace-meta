@@ -65,3 +65,12 @@ func ROT13(text string) string {
 func CaesarEncryptHex(plaintext string, key int) string {
 	return core.HexEncode([]byte(Encrypt(plaintext, key)))
 }
+
+// AllShifts 返回所有 26 种位移的加密结果（包括 key=0 原文）。
+func AllShifts(plaintext string) map[int]string {
+	out := make(map[int]string, 26)
+	for k := 0; k < 26; k++ {
+		out[k] = Encrypt(plaintext, k)
+	}
+	return out
+}
