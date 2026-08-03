@@ -29,6 +29,16 @@ func TestJSONSource_ReadArray(t *testing.T) {
 }
 
 func TestJSONSource_SingleObject(t *testing.T) {
+	// 单对象 JSON 应包成一行
+	p := writeTemp(t, "single.json", `{"key":"value"}`)
+	rows, err := (JSONSource{}).Read(map[string]any{"path": p})
+	if err != nil {
+		t.Fatalf("Read 失败: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("单对象应返回 1 行，实际 %d", len(rows))
+	}
+}
 
 func TestJSONSource_MissingPath(t *testing.T) {
 	if _, err := (JSONSource{}).Read(map[string]any{}); err == nil {

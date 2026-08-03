@@ -11,6 +11,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/QiuShichang/crypto-atlas/internal/core"
 )
 
 // Encrypt 加密明文。key 是位移量（可为负或 >26，自动取模到 0-25）。

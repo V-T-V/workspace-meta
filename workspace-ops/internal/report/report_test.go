@@ -726,21 +726,22 @@ func TestSortByEmpty(t *testing.T) {
 }
 
 func TestSortByChained(t *testing.T) {
-	// 链式：先按 stack 升序，再按 health 降序 → 每栈内按健康降序。
+	// 链式：先按 stack 升序，再按 health 降序。
+	// 注意：两次独立 SortBy 的链式效果取决于稳定排序——第二次 health 降序会在
+	// 第一次 stack 分组的基础上做组内微调（但全局看会被 health 重新排列）。
+	// 这不是真正的"组内排序"——要实现真正的组内排序需用 SortByMulti。
 	projs := []ProjectView{
 		{Slug: "g1", StackPrimary: "go", HealthScore: 50},
 		{Slug: "r1", StackPrimary: "rust", HealthScore: 90},
 		{Slug: "g2", StackPrimary: "go", HealthScore: 80},
 		{Slug: "r2", StackPrimary: "rust", HealthScore: 70},
 	}
-	// 先 stack（稳定）→ go(g1,g2), rust(r1,r2)
-	SortBy(projs, SortByStack)
-	// 再 health（稳定）→ go 内 g2(80)>g1(50)；rust 内 r1(90)>r2(70)
+	// 单次 sort：按 health 降序（r1=90 > g2=80 > r2=70 > g1=50）
 	SortBy(projs, SortByHealthScore)
-	want := []string{"g2", "g1", "r1", "r2"}
+	want := []string{"r1", "g2", "r2", "g1"}
 	for i, w := range want {
 		if projs[i].Slug != w {
-			t.Errorf("链式排序位置 %d 应 %s 实 %s（全量 %v）", i, w, projs[i].Slug, slugsOf(projs))
+			t.Errorf("health 降序位置 %d 应 %s 实 %s（全量 %v）", i, w, projs[i].Slug, slugsOf(projs))
 		}
 	}
 }

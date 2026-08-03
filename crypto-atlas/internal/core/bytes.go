@@ -7,6 +7,11 @@
 //   - 大数运算用标准库 math/big（RSA/DH 需要）
 package core
 
+import (
+	"fmt"
+	"strings"
+)
+
 // HexEncode 把字节切片转成十六进制小写字符串。
 func HexEncode(data []byte) string {
 	const hexdigits = "0123456789abcdef"

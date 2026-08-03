@@ -186,9 +186,10 @@ var rules = []rule{
 
 // Detector 是提示注入/越狱检测器。
 type Detector struct {
-	mu       sync.Mutex
-	ruleHits map[string]int
-	rules    []rule
+	mu            sync.Mutex
+	ruleHits      map[string]int
+	severityStats map[types.Severity]int
+	rules         []rule
 }
 
 // New 创建检测器（加载内置规则集）。
