@@ -31,6 +31,17 @@ func (CSVSource) Read(config map[string]any) (pipeline.Rows, error) {
 	if d, ok := config["delimiter"].(string); ok && d != "" {
 		delim = d
 	}
+	skipRows := 0
+	if sr, ok := config["skip_rows"]; ok {
+		switch v := sr.(type) {
+		case int:
+			skipRows = v
+		case int64:
+			skipRows = int(v)
+		case float64:
+			skipRows = int(v)
+		}
+	}
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -50,6 +61,12 @@ func (CSVSource) Read(config map[string]any) (pipeline.Rows, error) {
 		return nil, fmt.Errorf("解析 CSV 失败: %w", err)
 	}
 	if len(all) == 0 {
+		return pipeline.Rows{}, nil
+	}
+	// skip_rows：跳过前 N 行（如注释行）
+	if skipRows > 0 && skipRows < len(all) {
+		all = all[skipRows:]
+	} else if skipRows >= len(all) {
 		return pipeline.Rows{}, nil
 	}
 

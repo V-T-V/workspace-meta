@@ -233,3 +233,35 @@ func finiteUpper(buckets []types.HistogramBucket) float64 {
 	}
 	return 0
 }
+
+// Dedup 按 (name+labels) 去重，保留最后出现的点。
+func Dedup(points []types.MetricPoint) []types.MetricPoint {
+	seen := make(map[string]int) // key → index in result
+	var result []types.MetricPoint
+	for _, p := range points {
+		key := p.Name + labelsKeyStr(p.Labels)
+		if idx, ok := seen[key]; ok {
+			result[idx] = p // 覆盖为最新
+		} else {
+			seen[key] = len(result)
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+func labelsKeyStr(labels map[string]string) string {
+	if len(labels) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := ""
+	for _, k := range keys {
+		out += k + "=" + labels[k] + ","
+	}
+	return out
+}

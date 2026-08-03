@@ -162,3 +162,27 @@ func TestCausalOrder(t *testing.T) {
 	_ = o3
 	_ = e0
 }
+
+func TestVectorClockConcurrency(t *testing.T) {
+	n1 := NewVectorClock("n1", []core.NodeID{"n1", "n2", "n3"})
+	n3 := NewVectorClock("n3", []core.NodeID{"n1", "n2", "n3"})
+	// n1 和 n3 各自独立操作无消息交互
+	v1 := n1.Tick()
+	v3 := n3.Tick()
+	rel := Compare(v1, v3)
+	if rel != Concurrent {
+		t.Errorf("独立操作应 Concurrent，实际 %s", rel)
+	}
+}
+
+func TestVectorClockHappensBefore(t *testing.T) {
+	n1 := NewVectorClock("n1", []core.NodeID{"n1", "n2"})
+	n2 := NewVectorClock("n2", []core.NodeID{"n1", "n2"})
+	// n1 → n2 消息
+	v1 := n1.Tick()
+	v2 := n2.Observe(v1)
+	rel := Compare(v1, v2)
+	if rel != HappensBefore {
+		t.Errorf("n1→n2 应 HappensBefore，实际 %s", rel)
+	}
+}

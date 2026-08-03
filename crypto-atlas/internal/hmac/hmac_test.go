@@ -122,3 +122,29 @@ func equalBytes(a, b []byte) bool {
 	}
 	return true
 }
+
+func TestHMACTamperProof(t *testing.T) {
+	key := []byte("secret")
+	msg := []byte("important message")
+	mac := Compute(key, msg)
+
+	// 1. 正确验证
+	if !Verify(key, msg, mac) {
+		t.Error("正确密钥+原消息应验证通过")
+	}
+	// 2. 篡改消息
+	if Verify(key, []byte("tampered"), mac) {
+		t.Error("篡改消息应验证失败")
+	}
+	// 3. 篡改 MAC
+	tamperedMAC := make([]byte, len(mac))
+	copy(tamperedMAC, mac)
+	tamperedMAC[0] ^= 0xFF
+	if Verify(key, msg, tamperedMAC) {
+		t.Error("篡改 MAC 应验证失败")
+	}
+	// 4. 错误密钥
+	if Verify([]byte("wrong"), msg, mac) {
+		t.Error("错误密钥应验证失败")
+	}
+}

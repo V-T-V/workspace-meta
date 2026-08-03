@@ -441,3 +441,22 @@ func TestExtractLabelsDoesNotMutateInput(t *testing.T) {
 		t.Error("ExtractLabels 不应破坏入参的 Labels map")
 	}
 }
+
+func TestDedup(t *testing.T) {
+	now := time.Now()
+	points := []types.MetricPoint{
+		{Name: "x", Value: 1, Timestamp: now},
+		{Name: "y", Value: 2, Timestamp: now},
+		{Name: "x", Value: 3, Timestamp: now.Add(time.Second)},
+	}
+	deduped := Dedup(points)
+	if len(deduped) != 2 {
+		t.Errorf("去重后应有 2 个，实际 %d", len(deduped))
+	}
+	// x 的最后一个值应是 3
+	for _, p := range deduped {
+		if p.Name == "x" && p.Value != 3 {
+			t.Error("x 应保留最后值 3")
+		}
+	}
+}

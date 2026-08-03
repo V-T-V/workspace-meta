@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/QiuShichang/ai-safety-atlas/internal/types"
 )
@@ -185,12 +186,14 @@ var rules = []rule{
 
 // Detector 是提示注入/越狱检测器。
 type Detector struct {
-	rules []rule
+	mu       sync.Mutex
+	ruleHits map[string]int
+	rules    []rule
 }
 
 // New 创建检测器（加载内置规则集）。
 func New() *Detector {
-	return &Detector{rules: rules}
+	return &Detector{rules: rules, ruleHits: make(map[string]int)}
 }
 
 // AddRule 动态添加一条自定义规则（运行时扩展检测能力）。
@@ -233,6 +236,9 @@ func (d *Detector) Analyze(input string) []types.Detection {
 	var detections []types.Detection
 	for _, r := range d.rules {
 		if m := r.Pattern.FindString(input); m != "" {
+			d.mu.Lock()
+			d.ruleHits[r.Name]++
+			d.mu.Unlock()
 			detections = append(detections, types.Detection{
 				Type:       r.Type,
 				Severity:   r.Severity,
@@ -248,4 +254,16 @@ func (d *Detector) Analyze(input string) []types.Detection {
 // IsSafe 报告输入是否通过安全检测（无任何命中）。
 func (d *Detector) IsSafe(input string) bool {
 	return len(d.Analyze(input)) == 0
+}
+
+// RuleStats 返回每条规则的历史命中次数。
+// 需要先调用 Analyze 多次收集统计。
+func (d *Detector) RuleStats() map[string]int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make(map[string]int, len(d.ruleHits))
+	for k, v := range d.ruleHits {
+		out[k] = v
+	}
+	return out
 }
