@@ -272,3 +272,16 @@ func (d *Detector) RuleStats() map[string]int {
 func (d *Detector) IsAttack(input string) bool {
 	return !d.IsSafe(input)
 }
+
+// AttackTypes 返回内置规则覆盖的所有攻击类型。
+func (d *Detector) AttackTypes() []types.AttackType {
+	seen := map[types.AttackType]bool{}
+	for _, r := range d.rules {
+		seen[r.Type] = true
+	}
+	var out []types.AttackType
+	for t := range seen {
+		out = append(out, t)
+	}
+	return out
+}

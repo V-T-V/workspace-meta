@@ -702,3 +702,12 @@ func Contains(pattern, text string) bool {
 	}
 	return m.Match(text)
 }
+
+// AnchoredMatch 报告 text 是否完整匹配（等价 IsFullMatch 的包级便捷版）。
+func AnchoredMatch(pattern, text string) (bool, error) {
+	m, err := Compile(pattern)
+	if err != nil {
+		return false, err
+	}
+	return m.IsFullMatch(text), nil
+}

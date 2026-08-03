@@ -274,3 +274,14 @@ func CountByName(points []types.MetricPoint) map[string]int {
 	}
 	return out
 }
+
+// MergePoints 合并两组 metric 点，按时间戳排序。
+func MergePoints(a, b []types.MetricPoint) []types.MetricPoint {
+	result := make([]types.MetricPoint, 0, len(a)+len(b))
+	result = append(result, a...)
+	result = append(result, b...)
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Timestamp.Before(result[j].Timestamp)
+	})
+	return result
+}

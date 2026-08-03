@@ -637,6 +637,46 @@ func (itp *Interpreter) evalCall(e *core.CallExpr, env *Environment) (any, error
 		}
 		return string(runes[i]), nil
 	}
+	// 内置函数 min
+	if e.Callee == "min" && len(e.Args) == 2 {
+		a, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		b, err := itp.evalExpr(e.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		ai, ok1 := a.(int64)
+		bi, ok2 := b.(int64)
+		if !ok1 || !ok2 {
+			return nil, core.NewError(e.Loc, "min() 需要整数参数")
+		}
+		if ai < bi {
+			return ai, nil
+		}
+		return bi, nil
+	}
+	// 内置函数 max
+	if e.Callee == "max" && len(e.Args) == 2 {
+		a, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		b, err := itp.evalExpr(e.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		ai, ok1 := a.(int64)
+		bi, ok2 := b.(int64)
+		if !ok1 || !ok2 {
+			return nil, core.NewError(e.Loc, "max() 需要整数参数")
+		}
+		if ai > bi {
+			return ai, nil
+		}
+		return bi, nil
+	}
 	// 内置函数 abs
 	if e.Callee == "abs" && len(e.Args) == 1 {
 		v, err := itp.evalExpr(e.Args[0], env)

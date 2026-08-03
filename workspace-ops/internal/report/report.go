@@ -531,3 +531,15 @@ func CountByStack(projects []ProjectView) map[string]int {
 	}
 	return out
 }
+
+// AverageHealth 计算项目列表的平均健康评分。
+func AverageHealth(projects []ProjectView) int {
+	if len(projects) == 0 {
+		return 0
+	}
+	total := 0
+	for _, p := range projects {
+		total += CalculateHealth(p)
+	}
+	return total / len(projects)
+}

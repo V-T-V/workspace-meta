@@ -60,3 +60,8 @@ func Demo(ctx context.Context) (*DemoResult, error) {
 func ROT13(text string) string {
 	return Encrypt(text, 13)
 }
+
+// CaesarEncryptHex 加密并返回十六进制（调试用）。
+func CaesarEncryptHex(plaintext string, key int) string {
+	return core.HexEncode([]byte(Encrypt(plaintext, key)))
+}

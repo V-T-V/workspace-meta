@@ -199,3 +199,14 @@ func (p Pipeline) HasSteps() bool {
 func (p Pipeline) StepCount() int {
 	return len(p.Steps)
 }
+
+// MaxStepNameLen 返回最长步骤名长度（DOT 布局对齐用）。
+func (p Pipeline) MaxStepNameLen() int {
+	max := 0
+	for _, s := range p.Steps {
+		if len(s.ID) > max {
+			max = len(s.ID)
+		}
+	}
+	return max
+}

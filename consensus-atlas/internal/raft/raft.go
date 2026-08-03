@@ -490,3 +490,8 @@ func TermCompare(a, b uint64) int {
 	}
 	return 0
 }
+
+// QuorumSize 返回集群的多数派大小（n/2+1）。
+func QuorumSize(clusterSize int) int {
+	return clusterSize/2 + 1
+}
