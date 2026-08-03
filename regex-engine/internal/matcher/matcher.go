@@ -711,3 +711,12 @@ func AnchoredMatch(pattern, text string) (bool, error) {
 	}
 	return m.IsFullMatch(text), nil
 }
+
+// FindFirst 返回第一个匹配（或 nil）。
+func (m *Matcher) FindFirst(text string) *Match {
+	matches := m.FindAll(text)
+	if len(matches) == 0 {
+		return nil
+	}
+	return &matches[0]
+}

@@ -495,3 +495,11 @@ func TermCompare(a, b uint64) int {
 func QuorumSize(clusterSize int) int {
 	return clusterSize/2 + 1
 }
+
+// MaxTerm 返回两个任期中较大的。
+func MaxTerm(a, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+	return b
+}

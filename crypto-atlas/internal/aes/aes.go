@@ -119,3 +119,8 @@ func DecryptCBC(ciphertext, key, iv []byte) ([]byte, error) {
 	mode.CryptBlocks(padded, ciphertext)
 	return core.PKCS7Unpad(padded, blockSize)
 }
+
+// SupportedKeySizes 返回 AES 支持的密钥长度（字节）。
+func SupportedKeySizes() []int {
+	return []int{16, 24, 32}
+}

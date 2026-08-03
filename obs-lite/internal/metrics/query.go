@@ -285,3 +285,35 @@ func MergePoints(a, b []types.MetricPoint) []types.MetricPoint {
 	})
 	return result
 }
+
+// MinByName 返回某 metric 的最小值。
+func MinByName(points []types.MetricPoint, name string) float64 {
+	min := 0.0
+	first := true
+	for _, p := range points {
+		if p.Name != name {
+			continue
+		}
+		if first || p.Value < min {
+			min = p.Value
+			first = false
+		}
+	}
+	return min
+}
+
+// MaxByName 返回某 metric 的最大值。
+func MaxByName(points []types.MetricPoint, name string) float64 {
+	max := 0.0
+	first := true
+	for _, p := range points {
+		if p.Name != name {
+			continue
+		}
+		if first || p.Value > max {
+			max = p.Value
+			first = false
+		}
+	}
+	return max
+}

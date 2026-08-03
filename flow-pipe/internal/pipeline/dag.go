@@ -210,3 +210,20 @@ func (p Pipeline) MaxStepNameLen() int {
 	}
 	return max
 }
+
+// IsLinear 报告管道是否线性（每个步骤最多依赖一个上游、最多被一个下游依赖）。
+func (p Pipeline) IsLinear() bool {
+	depCount := map[string]int{}
+	for _, s := range p.Steps {
+		if len(s.DependsOn) > 1 {
+			return false
+		}
+		for _, d := range s.DependsOn {
+			depCount[d]++
+			if depCount[d] > 1 {
+				return false
+			}
+		}
+	}
+	return true
+}

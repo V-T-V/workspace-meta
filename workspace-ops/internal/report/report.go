@@ -543,3 +543,16 @@ func AverageHealth(projects []ProjectView) int {
 	}
 	return total / len(projects)
 }
+
+// TotalTestCount 统计所有项目的测试文件总数。
+func TotalTestCount(projects []ProjectView) int {
+	total := 0
+	for _, p := range projects {
+		if t := p.TestCount; t != "" && t != "0" {
+			n := 0
+			fmt.Sscanf(t, "%d", &n)
+			total += n
+		}
+	}
+	return total
+}

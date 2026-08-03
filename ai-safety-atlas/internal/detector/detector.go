@@ -193,7 +193,7 @@ type Detector struct {
 
 // New 创建检测器（加载内置规则集）。
 func New() *Detector {
-	return &Detector{rules: rules, ruleHits: make(map[string]int)}
+	return &Detector{rules: rules, ruleHits: make(map[string]int), severityStats: make(map[types.Severity]int)}
 }
 
 // AddRule 动态添加一条自定义规则（运行时扩展检测能力）。
@@ -238,6 +238,7 @@ func (d *Detector) Analyze(input string) []types.Detection {
 		if m := r.Pattern.FindString(input); m != "" {
 			d.mu.Lock()
 			d.ruleHits[r.Name]++
+			d.severityStats[r.Severity]++
 			d.mu.Unlock()
 			detections = append(detections, types.Detection{
 				Type:       r.Type,
@@ -284,4 +285,11 @@ func (d *Detector) AttackTypes() []types.AttackType {
 		out = append(out, t)
 	}
 	return out
+}
+
+// SeverityStats 返回历史检测的严重度分布。
+func (d *Detector) SeverityStats() map[types.Severity]int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.severityStats
 }
