@@ -55,3 +55,8 @@ func Demo(ctx context.Context) (*DemoResult, error) {
 	fmt.Printf("明文: %s\n密钥: %d\n密文: %s\n解密: %s\n", plain, key, ct, pt)
 	return &DemoResult{Plaintext: plain, Key: key, Ciphertext: ct, Decrypted: pt}, nil
 }
+
+// ROT13 是凯撒密码 key=13 的特例（自对合：加密=解密）。
+func ROT13(text string) string {
+	return Encrypt(text, 13)
+}

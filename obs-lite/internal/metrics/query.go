@@ -265,3 +265,12 @@ func labelsKeyStr(labels map[string]string) string {
 	}
 	return out
 }
+
+// CountByName 统计每个 metric 名称的数据点数量。
+func CountByName(points []types.MetricPoint) map[string]int {
+	out := map[string]int{}
+	for _, p := range points {
+		out[p.Name]++
+	}
+	return out
+}

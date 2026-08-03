@@ -637,6 +637,20 @@ func (itp *Interpreter) evalCall(e *core.CallExpr, env *Environment) (any, error
 		}
 		return string(runes[i]), nil
 	}
+	// 内置函数 abs
+	if e.Callee == "abs" && len(e.Args) == 1 {
+		v, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		if i, ok := v.(int64); ok {
+			if i < 0 {
+				return -i, nil
+			}
+			return i, nil
+		}
+		return nil, core.NewError(e.Loc, "abs() 参数必须是整数")
+	}
 	// 内置函数 push(arr, val)：向数组追加元素，返回新数组（不修改原数组）
 	if e.Callee == "push" && len(e.Args) == 2 {
 		arr, err := itp.evalExpr(e.Args[0], env)

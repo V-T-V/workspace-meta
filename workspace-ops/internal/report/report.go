@@ -518,3 +518,16 @@ func CalculateHealth(p ProjectView) int {
 // HasBuildArtifacts 从 ProjectView 推断（需要从 facts 填充）。
 // 当前 ProjectView 没有直接字段，用 stack 推断辅助字段。
 // 报告层用 Facts 里的 has_build_artifacts 设置。
+
+// CountByStack 统计每个技术栈的项目数。
+func CountByStack(projects []ProjectView) map[string]int {
+	out := map[string]int{}
+	for _, p := range projects {
+		stack := p.StackPrimary
+		if stack == "" {
+			stack = "unknown"
+		}
+		out[stack]++
+	}
+	return out
+}

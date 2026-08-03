@@ -693,3 +693,12 @@ func Quote(s string) string {
 	}
 	return b.String()
 }
+
+// Contains 报告 text 是否包含至少一个匹配（等价于 Match）。
+func Contains(pattern, text string) bool {
+	m, err := Compile(pattern)
+	if err != nil {
+		return false
+	}
+	return m.Match(text)
+}

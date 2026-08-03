@@ -189,3 +189,13 @@ func (p Pipeline) ToJSON() (string, error) {
 	}
 	return string(b), nil
 }
+
+// HasSteps 报告管道是否有步骤。
+func (p Pipeline) HasSteps() bool {
+	return len(p.Steps) > 0
+}
+
+// StepCount 返回步骤数。
+func (p Pipeline) StepCount() int {
+	return len(p.Steps)
+}

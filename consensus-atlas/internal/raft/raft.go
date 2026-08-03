@@ -479,3 +479,14 @@ func (n *Node) advanceCommit() {
 		}
 	}
 }
+
+// TermCompare 比较两个任期：返回 -1/0/1（a<b / a==b / a>b）。
+func TermCompare(a, b uint64) int {
+	if a < b {
+		return -1
+	}
+	if a > b {
+		return 1
+	}
+	return 0
+}

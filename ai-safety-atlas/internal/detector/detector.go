@@ -267,3 +267,8 @@ func (d *Detector) RuleStats() map[string]int {
 	}
 	return out
 }
+
+// IsAttack 报告输入是否被检测为攻击（简化版 IsSafe 的反面）。
+func (d *Detector) IsAttack(input string) bool {
+	return !d.IsSafe(input)
+}
