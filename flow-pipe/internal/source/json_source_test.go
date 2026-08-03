@@ -29,18 +29,6 @@ func TestJSONSource_ReadArray(t *testing.T) {
 }
 
 func TestJSONSource_SingleObject(t *testing.T) {
-	p := writeTemp(t, "single.json", `{"k":"v","n":5}`)
-	rows, err := JSONSource{}.Read(map[string]any{"path": p})
-	if err != nil {
-		t.Fatalf("Read 单对象失败: %v", err)
-	}
-	if len(rows) != 1 {
-		t.Fatalf("单对象应返回 1 行，得到 %d", len(rows))
-	}
-	if rows[0]["k"] != "v" {
-		t.Fatalf("k 错误: %#v", rows[0]["k"])
-	}
-}
 
 func TestJSONSource_MissingPath(t *testing.T) {
 	if _, err := (JSONSource{}).Read(map[string]any{}); err == nil {

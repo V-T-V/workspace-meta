@@ -7,6 +7,8 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/QiuShichang/workspace-ops/internal/inspector"
@@ -422,6 +424,69 @@ func Search(r Report, query string) []ProjectView {
 		}
 	}
 	return out
+}
+
+// SortField 是 SortBy 支持的排序维度。
+type SortField string
+
+const (
+	SortBySlug        SortField = "slug"         // 按项目 slug 字母序
+	SortByStack       SortField = "stack"        // 按 StackPrimary 字母序
+	SortByTestCount   SortField = "test_count"   // 按测试数数值降序（多测的在前）
+	SortByHealthScore SortField = "health_score" // 按健康分数值降序（健康的在前）
+)
+
+// SortBy 按 field 对 projects 原地排序，返回排序后的切片（即入参本身，便于链式用）。
+//
+// 各字段排序语义：
+//   - slug / stack：字符串升序（A→Z），空值视为最大（排到末尾，避免空栈挤到前面）。
+//   - test_count / health_score：数值降序（大值在前）；test_count 解析失败或为空按 0 处理。
+//
+// 同字段相等时保持稳定（用 sort.SliceStable），保留项目在输入里的相对顺序，
+// 这样多次排序可叠加（如先按 stack 再按 health，得到"每栈内按健康降序"）。
+//
+// 未知 field 不排序（原样返回），便于调用方传用户输入而不必先校验。
+func SortBy(projects []ProjectView, field SortField) []ProjectView {
+	switch field {
+	case SortBySlug:
+		sort.SliceStable(projects, func(i, j int) bool {
+			return projects[i].Slug < projects[j].Slug
+		})
+	case SortByStack:
+		sort.SliceStable(projects, func(i, j int) bool {
+			// 空栈排到末尾：用 (=="" 的额外项) 让空值更大。
+			ei, ej := projects[i].StackPrimary == "", projects[j].StackPrimary == ""
+			if ei != ej {
+				return !ei // 非空的（false）排前
+			}
+			return projects[i].StackPrimary < projects[j].StackPrimary
+		})
+	case SortByTestCount:
+		sort.SliceStable(projects, func(i, j int) bool {
+			return parseTestCount(projects[i].TestCount) > parseTestCount(projects[j].TestCount)
+		})
+	case SortByHealthScore:
+		sort.SliceStable(projects, func(i, j int) bool {
+			return projects[i].HealthScore > projects[j].HealthScore
+		})
+	}
+	return projects
+}
+
+// parseTestCount 把 test_count 字符串解析为整数，空/非法返回 0。
+// 与 CalculateHealth 把 test_count 当"有无"判断不同，这里要数值用于排序。
+func parseTestCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	if n < 0 {
+		return 0
+	}
+	return n
 }
 
 // CalculateHealth 计算项目健康评分（0-100）。

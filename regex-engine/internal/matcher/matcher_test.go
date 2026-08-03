@@ -2,6 +2,7 @@ package matcher
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/QiuShichang/regex-engine/internal/nfa"
@@ -1131,4 +1132,96 @@ func TestQuoteMatchesStdLib(t *testing.T) {
 // stdQuoteMeta 是 regexp.QuoteMeta 的标准库调用，用于交叉验证 Quote 的字符集与实现。
 func stdQuoteMeta(s string) string {
 	return regexp.QuoteMeta(s)
+}
+
+// ===== HasPrefix / HasSuffix 便捷函数 =====
+
+// TestHasPrefix 与 strings.HasPrefix 对照（含元字符、空串、中文等）。
+func TestHasPrefix(t *testing.T) {
+	cases := []struct {
+		text   string
+		prefix string
+		want   bool
+	}{
+		{"hello world", "hello", true},
+		{"hello world", "world", false},
+		{"hello", "hello", true},    // 整段等于前缀
+		{"hello", "hellooo", false}, // 前缀比 text 长
+		{"hello", "", true},         // 空前缀
+		{"", "", true},              // 均空
+		{"", "x", false},            // 空文本非空前缀
+		// 元字符应按字面量匹配（Quote 转义后语义不变）
+		{"1+1=2", "1+1", true},
+		{"1+1=2", "1+2", false},
+		{"(a)b", "(a)", true},
+		{`a\b`, `a\`, true},
+		// 中文按 rune 比对
+		{"你好世界", "你好", true},
+		{"你好世界", "好你", false},
+		// 换行相关：HasPrefix 只看开头，不受 ^ 多行语义影响
+		{"\nhello", "\n", true},
+		{"\nhello", "h", false},
+	}
+	for _, c := range cases {
+		got := HasPrefix(c.text, c.prefix)
+		if got != c.want {
+			t.Errorf("HasPrefix(%q, %q) = %v, want %v", c.text, c.prefix, got, c.want)
+		}
+		// 与标准库 strings.HasPrefix 交叉验证
+		if got != strings.HasPrefix(c.text, c.prefix) {
+			t.Errorf("HasPrefix(%q, %q) = %v 与 strings.HasPrefix 不一致",
+				c.text, c.prefix, got)
+		}
+	}
+}
+
+// TestHasSuffix 与 strings.HasSuffix 对照。
+func TestHasSuffix(t *testing.T) {
+	cases := []struct {
+		text   string
+		suffix string
+		want   bool
+	}{
+		{"hello world", "world", true},
+		{"hello world", "hello", false},
+		{"hello", "hello", true},
+		{"hello", "ooo", false},
+		{"hello", "", true}, // 空后缀
+		{"", "", true},
+		{"", "x", false},
+		// 元字符字面量
+		{"1+1=2", "+1=2", true},
+		{"1+1=2", "1+1=2", true},
+		{"(a)b", "a)b", true},
+		{`a\b`, `\b`, true},
+		// 中文按 rune
+		{"你好世界", "世界", true},
+		{"你好世界", "好世", false},
+		// 换行：suffix 中含 \n 时按字面字符比对
+		{"hello\n", "\n", true},
+		{"hello\n", "o", false},
+	}
+	for _, c := range cases {
+		got := HasSuffix(c.text, c.suffix)
+		if got != c.want {
+			t.Errorf("HasSuffix(%q, %q) = %v, want %v", c.text, c.suffix, got, c.want)
+		}
+		// 与标准库 strings.HasSuffix 交叉验证
+		if got != strings.HasSuffix(c.text, c.suffix) {
+			t.Errorf("HasSuffix(%q, %q) = %v 与 strings.HasSuffix 不一致",
+				c.text, c.suffix, got)
+		}
+	}
+}
+
+// TestHasPrefixSuffixLargePrefix 前缀/后缀比 text 还长时必须返回 false（不能 panic/越界）。
+func TestHasPrefixSuffixLargePrefix(t *testing.T) {
+	short := "ab"
+	long := "abcdef"
+	if HasPrefix(short, long) {
+		t.Error("HasPrefix(text短, prefix长) 应 false")
+	}
+	if HasSuffix(short, long) {
+		t.Error("HasSuffix(text短, suffix长) 应 false")
+	}
 }

@@ -587,44 +587,62 @@ func MustMatchString(pattern, text string) bool {
 	return m.Match(text)
 }
 
-// HasPrefix 报告 text 是否以 prefix 开头。
+// HasPrefix 报告 text 是否以 prefix 开头（等价 strings.HasPrefix）。
 //
 // 实现：把 prefix 用 Quote 转义（保证其中的正则元字符当字面量），
-// 再加 '^' 锚定到串首，用 IsFullMatch 判断从开头是否匹配。
-// 等价于标准库 strings.HasPrefix，但复用本引擎的 NFA 路径，
-// 也让"前缀含正则元字符"的场景能被一致处理（元字符按字面量对待）。
+// 编译后用 FindAll 找出最左匹配，判断其是否落在位置 0。
+//
+// 为什么不用 "^"+prefix：本引擎 ^ 在多行模式下也认 '\n' 之后为行首
+// (anchorHolds: pos==0 或 runes[pos-1]=='\n')，直接用 ^ 会让
+// HasPrefix("\nworld","world") 错误返回 true，偏离 strings.HasPrefix 语义。
+// 改成"匹配字面 prefix 并核对 Start==0"后，与标准库行为完全一致。
+//
+// 空前缀直接返回 true（strings.HasPrefix 的语义）；这也是 FindAll 在空模式
+// 下的退化语义可能引发歧义，所以特判短路。
 //
 // 一次性调用：内部会编译一次 NFA。若要对同一 prefix 检查大量 text，
-// 应先 Compile("^" + Quote(prefix)) 复用 Matcher。
-//
-//	prefix 中的 '\n'：本引擎 ^ 认 '\n' 后为行首（多行语义），
-//	但配合 IsFullMatch 要求"整段匹配"，所以前缀若跨行仍按字面字符比对。
+// 应先 Compile(Quote(prefix)) 复用 Matcher 并自行核对 Start==0。
 func HasPrefix(text, prefix string) bool {
-	m, err := Compile("^" + Quote(prefix))
+	if prefix == "" {
+		return true // 空前缀恒匹配（与 strings.HasPrefix 一致）
+	}
+	m, err := Compile(Quote(prefix))
 	if err != nil {
-		// Quote 已转义所有元字符，'+' 前缀的 '^' 合法，
-		// 编译失败理论上不可达。失败时保守返回 false。
+		// Quote 已转义所有元字符，编译失败理论上不可达；保守返回 false。
 		return false
 	}
-	return m.IsFullMatch(text)
+	matches := m.FindAll(text)
+	// FindAll 从左到右扫描，matches[0] 是最左匹配。它在位置 0 才算"前缀"。
+	return len(matches) > 0 && matches[0].Start == 0
 }
 
-// HasSuffix 报告 text 是否以 suffix 结尾。
+// HasSuffix 报告 text 是否以 suffix 结尾（等价 strings.HasSuffix）。
 //
-// 实现：把 suffix 用 Quote 转义（保证其中的正则元字符当字面量），
-// 再加 '$' 锚定到串尾，用 IsFullMatch 判断整段是否匹配。
-// 等价于标准库 strings.HasSuffix，但复用本引擎的 NFA 路径。
+// 实现：把 suffix 用 Quote 转义，编译后用 FindAll 找出所有匹配，
+// 判断是否存在某个匹配的 End 恰好等于 text 的 rune 长度。
 //
-//	suffix 中的 '\n'：本引擎 $ 在 pos==len(runes) 或当前字符为 '\n' 时成立，
-//	配合 IsFullMatch 的"整段匹配"约束，按字面字符比对，与 strings.HasSuffix 一致。
+// 为什么不用 suffix+"$"：本引擎 $ 在多行模式下也认当前字符为 '\n' 时成立
+// (anchorHolds: pos==len(runes) 或 runes[pos]=='\n')，直接用 $ 会让
+// HasSuffix("helloworld\n","world") 错误返回 true（world 后跟 \n 时 $ 也成立），
+// 偏离 strings.HasSuffix 语义。改成核对 End==len(runes) 后完全一致。
 //
-// 一次性调用语义同 HasPrefix：高频调用应预编译。
+// 空后缀直接返回 true；一次性调用语义同 HasPrefix。
 func HasSuffix(text, suffix string) bool {
-	m, err := Compile(Quote(suffix) + "$")
+	if suffix == "" {
+		return true // 空后缀恒匹配（与 strings.HasSuffix 一致）
+	}
+	m, err := Compile(Quote(suffix))
 	if err != nil {
 		return false
 	}
-	return m.IsFullMatch(text)
+	runes := []rune(text)
+	end := len(runes)
+	for _, mt := range m.FindAll(text) {
+		if mt.End == end {
+			return true
+		}
+	}
+	return false
 }
 
 // metaChars 是本引擎识别的正则元字符。Quote 会在它们前面加反斜杠转义。

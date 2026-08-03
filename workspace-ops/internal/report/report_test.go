@@ -559,3 +559,218 @@ func TestSearchReturnsCopies(t *testing.T) {
 		t.Error("Search 返回的应是值拷贝，修改结果不应影响原 Report")
 	}
 }
+
+// ===== SortBy =====
+
+// sortedProjects 构造一组用于排序测试的项目（顺序故意打乱）。
+func sortedProjects() []ProjectView {
+	return []ProjectView{
+		{Slug: "zeta", StackPrimary: "go", TestCount: "5", HealthScore: 50},
+		{Slug: "alpha", StackPrimary: "rust", TestCount: "20", HealthScore: 90},
+		{Slug: "mid", StackPrimary: "", TestCount: "0", HealthScore: 70},
+		{Slug: "beta", StackPrimary: "go", TestCount: "12", HealthScore: 70},
+	}
+}
+
+func TestSortBySlug(t *testing.T) {
+	got := SortBy(sortedProjects(), SortBySlug)
+	want := []string{"alpha", "beta", "mid", "zeta"}
+	if len(got) != len(want) {
+		t.Fatalf("应有 %d 个，实际 %d", len(want), len(got))
+	}
+	for i, w := range want {
+		if got[i].Slug != w {
+			t.Errorf("位置 %d 应 %s 实 %s（全量 %v）", i, w, got[i].Slug, slugsOf(got))
+		}
+	}
+}
+
+func TestSortByStack(t *testing.T) {
+	// 升序：空栈排末尾 → go, go, rust, ""(mid)。
+	got := SortBy(sortedProjects(), SortByStack)
+	want := []string{"go", "go", "rust", ""}
+	if len(got) != len(want) {
+		t.Fatalf("应有 %d 个，实际 %d", len(want), len(got))
+	}
+	for i, w := range want {
+		if got[i].StackPrimary != w {
+			t.Errorf("位置 %d stack 应 %q 实 %q（全量 %v）", i, w, got[i].StackPrimary, stacksOf(got))
+		}
+	}
+}
+
+func TestSortByStackEmptyLast(t *testing.T) {
+	// 多个空栈都应排到末尾，非空栈在前面字母序。
+	projs := []ProjectView{
+		{Slug: "a", StackPrimary: ""},
+		{Slug: "b", StackPrimary: "go"},
+		{Slug: "c", StackPrimary: ""},
+		{Slug: "d", StackPrimary: "ada"},
+	}
+	got := SortBy(projs, SortByStack)
+	// 期望：ada, go, "", ""（空栈两个都在末尾）。
+	want := []string{"ada", "go", "", ""}
+	for i, w := range want {
+		if got[i].StackPrimary != w {
+			t.Errorf("位置 %d stack 应 %q 实 %q（全量 %v）", i, w, got[i].StackPrimary, stacksOf(got))
+		}
+	}
+}
+
+func TestSortByTestCount(t *testing.T) {
+	// 数值降序：20 > 12 > 5 > 0。
+	got := SortBy(sortedProjects(), SortByTestCount)
+	want := []int{20, 12, 5, 0}
+	if len(got) != len(want) {
+		t.Fatalf("应有 %d 个，实际 %d", len(want), len(got))
+	}
+	for i, w := range want {
+		if n := parseTestCount(got[i].TestCount); n != w {
+			t.Errorf("位置 %d test_count 应 %d 实 %d（全量 %v）", i, w, n, countsOf(got))
+		}
+	}
+}
+
+func TestSortByTestCountNumericNotLexicographic(t *testing.T) {
+	// 关键：字符串序会把 "9" > "100"，但数值序应 100 > 9。
+	projs := []ProjectView{
+		{Slug: "few", TestCount: "9"},
+		{Slug: "many", TestCount: "100"},
+		{Slug: "none", TestCount: "0"},
+	}
+	got := SortBy(projs, SortByTestCount)
+	want := []string{"many", "few", "none"}
+	for i, w := range want {
+		if got[i].Slug != w {
+			t.Errorf("数值序位置 %d 应 %s 实 %s（全量 %v）", i, w, got[i].Slug, slugsOf(got))
+		}
+	}
+}
+
+func TestSortByTestCountInvalidHandledAsZero(t *testing.T) {
+	// 非法 test_count（非数字）按 0 处理，不 panic。
+	projs := []ProjectView{
+		{Slug: "bad", TestCount: "abc"},
+		{Slug: "good", TestCount: "5"},
+		{Slug: "empty", TestCount: ""},
+	}
+	got := SortBy(projs, SortByTestCount)
+	// good(5) 在前；bad(0)/empty(0) 平局，稳定排序保持原相对顺序：bad 在 empty 前。
+	if got[0].Slug != "good" {
+		t.Errorf("数值最大应在前：good，实际 %s（全量 %v）", got[0].Slug, slugsOf(got))
+	}
+	if got[1].Slug != "bad" || got[2].Slug != "empty" {
+		t.Errorf("平局应稳定（保持原序 bad→empty），实际 %v", slugsOf(got))
+	}
+}
+
+func TestSortByHealthScore(t *testing.T) {
+	// 数值降序：90 > 70 > 70 > 50（70 平局稳定）。
+	got := SortBy(sortedProjects(), SortByHealthScore)
+	want := []int{90, 70, 70, 50}
+	if len(got) != len(want) {
+		t.Fatalf("应有 %d 个，实际 %d", len(want), len(got))
+	}
+	for i, w := range want {
+		if got[i].HealthScore != w {
+			t.Errorf("位置 %d health 应 %d 实 %d（全量 %v）", i, w, got[i].HealthScore, healthsOf(got))
+		}
+	}
+}
+
+func TestSortByHealthScoreStable(t *testing.T) {
+	// 同分时应保持原输入相对顺序（稳定排序）。
+	projs := []ProjectView{
+		{Slug: "p1", HealthScore: 50},
+		{Slug: "p2", HealthScore: 80},
+		{Slug: "p3", HealthScore: 50},
+		{Slug: "p4", HealthScore: 80},
+	}
+	got := SortBy(projs, SortByHealthScore)
+	// 两个 80（p2,p4）和两个 50（p1,p3）各自保持原序。
+	want := []string{"p2", "p4", "p1", "p3"}
+	for i, w := range want {
+		if got[i].Slug != w {
+			t.Errorf("稳定排序位置 %d 应 %s 实 %s（全量 %v）", i, w, got[i].Slug, slugsOf(got))
+		}
+	}
+}
+
+func TestSortByUnknownFieldNoOp(t *testing.T) {
+	// 未知 field 不排序，原序返回。
+	projs := sortedProjects()
+	orig := append([]ProjectView(nil), projs...)
+	got := SortBy(projs, SortField("nonsense"))
+	for i := range orig {
+		if got[i].Slug != orig[i].Slug {
+			t.Errorf("未知 field 应原序返回：位置 %d 期望 %s 实际 %s", i, orig[i].Slug, got[i].Slug)
+		}
+	}
+}
+
+func TestSortByReturnsSameSlice(t *testing.T) {
+	// 返回值应是入参切片本身（原地排序），便于链式调用。
+	projs := sortedProjects()
+	got := SortBy(projs, SortBySlug)
+	if len(got) == 0 || &got[0] != &projs[0] {
+		t.Error("SortBy 应返回入参切片本身（原地排序）")
+	}
+}
+
+func TestSortByEmpty(t *testing.T) {
+	// 空切片不 panic，返回空。
+	got := SortBy(nil, SortBySlug)
+	if len(got) != 0 {
+		t.Errorf("空入参应返回空切片，实际 %d 个", len(got))
+	}
+}
+
+func TestSortByChained(t *testing.T) {
+	// 链式：先按 stack 升序，再按 health 降序 → 每栈内按健康降序。
+	projs := []ProjectView{
+		{Slug: "g1", StackPrimary: "go", HealthScore: 50},
+		{Slug: "r1", StackPrimary: "rust", HealthScore: 90},
+		{Slug: "g2", StackPrimary: "go", HealthScore: 80},
+		{Slug: "r2", StackPrimary: "rust", HealthScore: 70},
+	}
+	// 先 stack（稳定）→ go(g1,g2), rust(r1,r2)
+	SortBy(projs, SortByStack)
+	// 再 health（稳定）→ go 内 g2(80)>g1(50)；rust 内 r1(90)>r2(70)
+	SortBy(projs, SortByHealthScore)
+	want := []string{"g2", "g1", "r1", "r2"}
+	for i, w := range want {
+		if projs[i].Slug != w {
+			t.Errorf("链式排序位置 %d 应 %s 实 %s（全量 %v）", i, w, projs[i].Slug, slugsOf(projs))
+		}
+	}
+}
+
+// slugsOf / stacksOf / countsOf / healthsOf 是测试辅助：抽出某字段为字符串切片。
+func slugsOf(ps []ProjectView) []string {
+	out := make([]string, len(ps))
+	for i, p := range ps {
+		out[i] = p.Slug
+	}
+	return out
+}
+func stacksOf(ps []ProjectView) []string {
+	out := make([]string, len(ps))
+	for i, p := range ps {
+		out[i] = p.StackPrimary
+	}
+	return out
+}
+func countsOf(ps []ProjectView) []int {
+	out := make([]int, len(ps))
+	for i, p := range ps {
+		out[i] = parseTestCount(p.TestCount)
+	}
+	return out
+}
+func healthsOf(ps []ProjectView) []int {
+	out := make([]int, len(ps))
+	for i, p := range ps {
+		out[i] = p.HealthScore
+	}
+	return out
+}

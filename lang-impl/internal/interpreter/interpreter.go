@@ -593,6 +593,26 @@ func (itp *Interpreter) evalCall(e *core.CallExpr, env *Environment) (any, error
 		}
 		return out, nil
 	}
+	// 内置函数 range(n)：返回 [0, 1, ..., n-1] 数组。
+	// 用于 for 循环遍历索引、生成序列。n<0 返回空数组。
+	if e.Callee == "range" && len(e.Args) == 1 {
+		v, err := itp.evalExpr(e.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		n, ok := v.(int64)
+		if !ok {
+			return nil, core.NewError(e.Loc, "range() 参数必须是整数，实际 %s", typeName(v))
+		}
+		if n <= 0 {
+			return []any{}, nil
+		}
+		out := make([]any, n)
+		for i := int64(0); i < n; i++ {
+			out[i] = i
+		}
+		return out, nil
+	}
 	// 内置函数 charAt(str, index)：返回指定位置的单字符字符串
 	if e.Callee == "charAt" && len(e.Args) == 2 {
 		s, err := itp.evalExpr(e.Args[0], env)
