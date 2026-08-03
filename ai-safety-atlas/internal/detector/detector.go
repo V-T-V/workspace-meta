@@ -293,3 +293,11 @@ func (d *Detector) SeverityStats() map[types.Severity]int {
 	defer d.mu.Unlock()
 	return d.severityStats
 }
+
+// ResetStats 清空规则命中统计。
+func (d *Detector) ResetStats() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.ruleHits = make(map[string]int)
+	d.severityStats = make(map[types.Severity]int)
+}

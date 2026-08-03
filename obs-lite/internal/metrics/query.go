@@ -317,3 +317,12 @@ func MaxByName(points []types.MetricPoint, name string) float64 {
 	}
 	return max
 }
+
+// CountMetrics 返回不同 metric 名称的数量。
+func CountMetrics(points []types.MetricPoint) int {
+	seen := map[string]bool{}
+	for _, p := range points {
+		seen[p.Name] = true
+	}
+	return len(seen)
+}

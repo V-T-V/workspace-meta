@@ -227,3 +227,25 @@ func (p Pipeline) IsLinear() bool {
 	}
 	return true
 }
+
+// SourceCount 返回 source 步骤数。
+func (p Pipeline) SourceCount() int {
+	c := 0
+	for _, s := range p.Steps {
+		if s.Kind == KindSource {
+			c++
+		}
+	}
+	return c
+}
+
+// SinkCount 返回 sink 步骤数。
+func (p Pipeline) SinkCount() int {
+	c := 0
+	for _, s := range p.Steps {
+		if s.Kind == KindSink {
+			c++
+		}
+	}
+	return c
+}

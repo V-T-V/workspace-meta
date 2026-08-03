@@ -503,3 +503,8 @@ func MaxTerm(a, b uint64) uint64 {
 	}
 	return b
 }
+
+// IsLeader 报告节点是否为 Leader。
+func (n *Node) IsLeader() bool {
+	return n.State == core.StateLeader
+}

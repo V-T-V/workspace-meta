@@ -720,3 +720,9 @@ func (m *Matcher) FindFirst(text string) *Match {
 	}
 	return &matches[0]
 }
+
+// MustFindAll 同 FindAll 但 panic 而非返回空（链式调用用）。
+func (m *Matcher) MustFindAll(text string) []Match {
+	matches := m.FindAll(text)
+	return matches
+}

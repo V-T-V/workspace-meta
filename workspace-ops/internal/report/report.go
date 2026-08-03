@@ -556,3 +556,14 @@ func TotalTestCount(projects []ProjectView) int {
 	}
 	return total
 }
+
+// DirtyProjects 返回 git dirty 的项目列表。
+func DirtyProjects(projects []ProjectView) []ProjectView {
+	var out []ProjectView
+	for _, p := range projects {
+		if p.GitDirty {
+			out = append(out, p)
+		}
+	}
+	return out
+}

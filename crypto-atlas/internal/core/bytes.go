@@ -101,3 +101,40 @@ func PKCS7Unpad(data []byte, blockSize int) ([]byte, error) {
 	}
 	return data[:n-padLen], nil
 }
+
+// EncodeBase64 把字节编码为 base64 字符串。
+func EncodeBase64(data []byte) string {
+	return base64Encode(data)
+}
+
+// base64Encode 零依赖 base64 编码（标准字母表）。
+func base64Encode(data []byte) string {
+	const tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	var result []byte
+	for i := 0; i < len(data); i += 3 {
+		b1 := data[i]
+		var b2, b3 byte
+		has2, has3 := false, false
+		if i+1 < len(data) {
+			b2 = data[i+1]
+			has2 = true
+		}
+		if i+2 < len(data) {
+			b3 = data[i+2]
+			has3 = true
+		}
+		result = append(result, tbl[b1>>2])
+		result = append(result, tbl[((b1&0x03)<<4)|(b2>>4)])
+		if has2 {
+			result = append(result, tbl[((b2&0x0f)<<2)|(b3>>6)])
+		} else {
+			result = append(result, '=')
+		}
+		if has3 {
+			result = append(result, tbl[b3&0x3f])
+		} else {
+			result = append(result, '=')
+		}
+	}
+	return string(result)
+}

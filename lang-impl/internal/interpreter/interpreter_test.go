@@ -1066,3 +1066,41 @@ return a() + a() + b();` // a:1, a:2, b:1 → 4
 		t.Errorf("两个独立 counter 应为 4（a=1,a=2,b=1），实际 %d", got)
 	}
 }
+
+func TestMinMax(t *testing.T) {
+	if runInt(t, "return min(3, 7);") != 3 {
+		t.Error("min(3,7)应为3")
+	}
+	if runInt(t, "return max(3, 7);") != 7 {
+		t.Error("max(3,7)应为7")
+	}
+	if runInt(t, "return abs(-5);") != 5 {
+		t.Error("abs(-5)应为5")
+	}
+}
+
+func TestRangeBuiltin(t *testing.T) {
+	src := `let r = range(5); return len(r);`
+	if runInt(t, src) != 5 {
+		t.Error("range(5)长度应为5")
+	}
+	// 验证 range(3)[0]==0, [1]==1, [2]==2
+	src2 := `let r = range(3); return r[0] + r[1] + r[2];`
+	if runInt(t, src2) != 3 {
+		t.Error("range(3)元素和应为3")
+	}
+}
+
+func TestJoinBuiltin(t *testing.T) {
+	got := runString(t, `let parts = ["a","b","c"]; return join(parts, "-");`)
+	if got != "a-b-c" {
+		t.Errorf("join应为a-b-c，实际%q", got)
+	}
+}
+
+func TestSplitBuiltin(t *testing.T) {
+	src := `let parts = split("a-b-c", "-"); return len(parts);`
+	if runInt(t, src) != 3 {
+		t.Error("split应返回3段")
+	}
+}

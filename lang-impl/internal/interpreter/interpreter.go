@@ -989,3 +989,7 @@ func FormatValue(v any) string {
 	}
 	return fmt.Sprintf("%v", v)
 }
+
+// 内置函数 reverse（字符串反转）
+// 在 evalCall 里检测
+funcX:
